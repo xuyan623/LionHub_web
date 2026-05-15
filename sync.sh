@@ -4,8 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-DB_FILE="data/lion_hub.db"
-BACKUP_FILE="/tmp/lion_hub_runtime.db"
+BACKUP_DIR="/tmp/lion_hub_data_backup"
 
 echo "[*] Syncing Lion Hub from GitHub..."
 
@@ -20,10 +19,11 @@ else
   echo "[i] Server is not running"
 fi
 
-# 2. Backup runtime database (contains live data from phone usage)
-if [ -f "$DB_FILE" ]; then
-  cp "$DB_FILE" "$BACKUP_FILE"
-  echo "[✓] Runtime database backed up"
+# 2. Backup entire data directory
+if [ -d "data" ]; then
+  rm -rf "$BACKUP_DIR"
+  cp -r data "$BACKUP_DIR"
+  echo "[✓] Data directory backed up"
 fi
 
 # 3. Fetch and force overwrite to match GitHub
@@ -31,11 +31,12 @@ git fetch origin
 git reset --hard origin/master
 echo "[✓] Code synced from GitHub"
 
-# 4. Restore runtime database (preserve phone-side live data)
-if [ -f "$BACKUP_FILE" ]; then
-  cp "$BACKUP_FILE" "$DB_FILE"
-  rm -f "$BACKUP_FILE"
-  echo "[✓] Runtime database restored"
+# 4. Restore data directory (preserve phone-side live data)
+if [ -d "$BACKUP_DIR" ]; then
+  rm -rf data
+  cp -r "$BACKUP_DIR" data
+  rm -rf "$BACKUP_DIR"
+  echo "[✓] Data directory restored"
 fi
 
 # 5. Restart server in background
