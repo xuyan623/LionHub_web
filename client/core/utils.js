@@ -1,4 +1,5 @@
 import { uid } from "./security.js";
+import { state } from "./state.js";
 
 export function createComment(title, content, member) {
   return {
