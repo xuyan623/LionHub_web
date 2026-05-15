@@ -40,7 +40,7 @@ fi
 
 # 5. Restart server in background
 echo "[*] Starting server..."
-chmod +x start_server.sh
+chmod +x start_server.sh sync.sh
 ./start_server.sh start
 
 echo ""
