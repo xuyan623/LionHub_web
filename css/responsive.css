@@ -1,0 +1,241 @@
+/* Keyframes */
+@keyframes flashIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes loadingBar {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive: 1320px */
+@media (max-width: 1320px) {
+  .metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .page-grid.columns-3,
+  .split-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-grid.columns-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .market-stage {
+    flex-direction: column;
+  }
+
+  .member-stage {
+    flex-direction: column;
+  }
+
+  .market-stage-meta {
+    justify-content: flex-start;
+    max-width: none;
+  }
+}
+
+/* Responsive: 1080px */
+@media (max-width: 1080px) {
+  .auth-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .auth-aside {
+    padding: 0 28px 28px;
+  }
+
+  .hero-panel {
+    border-radius: 28px;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    left: 16px;
+    top: 16px;
+    bottom: 16px;
+    width: min(320px, calc(100vw - 32px));
+    height: auto;
+    transform: translateX(-118%);
+    transition: transform 220ms ease;
+    z-index: 20;
+    border-radius: 28px;
+    overscroll-behavior: contain;
+  }
+
+  .sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .mobile-toggle {
+    display: inline-flex;
+  }
+
+  .main-area {
+    padding: 20px;
+  }
+
+  .topbar {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Responsive: 760px */
+@media (max-width: 760px) {
+  .auth-panel,
+  .auth-aside,
+  .main-area {
+    padding: 18px;
+  }
+
+  .auth-card,
+  .hero-panel,
+  .modal-card {
+    padding: 22px;
+  }
+
+  .field-grid,
+  .field-grid-3,
+  .hero-grid,
+  .robot-grid,
+  .member-grid,
+  .ranking-grid,
+  .project-grid,
+  .settings-grid,
+  .calendar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header {
+    flex-direction: column;
+  }
+
+  .market-board {
+    padding: 18px;
+  }
+
+  .member-board {
+    padding: 18px;
+  }
+
+  .market-waterfall {
+    column-width: auto;
+    columns: 1;
+  }
+
+  .member-waterfall {
+    column-width: auto;
+    columns: 1;
+  }
+
+  .topbar-actions,
+  .button-row,
+  .page-actions {
+    width: 100%;
+  }
+
+  /* Topbar actions: wrap cleanly on small screens */
+  .topbar-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .topbar-actions .topbar-chip {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+
+  .topbar-actions .profile-pill > div:last-child {
+    display: none;
+  }
+
+  .topbar-actions .profile-pill {
+    padding: 4px;
+  }
+
+  /* Section header in modals/panels: stack vertically on mobile */
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .section-header .button-row {
+    display: flex;
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 8px;
+  }
+
+  /* Button rows inside panels/pages: use grid for even alignment */
+  .panel .button-row,
+  .page-header .button-row,
+  .page-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .panel .button-row > button,
+  .panel .button-row > a,
+  .page-header .button-row > button,
+  .page-header .button-row > a,
+  .page-actions > button,
+  .page-actions > a {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  .search-shell {
+    order: 2;
+  }
+
+  .data-table {
+    min-width: 760px;
+  }
+
+  .notif-panel {
+    right: auto !important;
+    left: 0 !important;
+    width: calc(100vw - 48px) !important;
+  }
+}

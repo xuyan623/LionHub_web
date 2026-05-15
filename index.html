@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="build" content="">
+  <title>醒狮战队协作中枢</title>
+  <meta
+    name="description"
+    content="醒狮战队协作中枢：面向 RoboMaster 战队的成员管理、任务市场、积分结算与兵种项目协作平台。"
+  >
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23050505'/%3E%3Cpath d='M18 18h28v8H34v22h-8V26H18z' fill='white'/%3E%3C/svg%3E">
+  <script>
+    (function() {
+      // ========== 唯一版本号定义处，每次发版只改这里 ==========
+      var BUILD_VERSION = '20260515-ux-v13';
+      // =====================================================
+
+      window.BUILD_VERSION = BUILD_VERSION;
+
+      // 设置 meta build
+      var meta = document.querySelector('meta[name="build"]');
+      if (meta) meta.setAttribute('content', BUILD_VERSION);
+
+      // 动态加载 CSS
+      var cssFiles = ['base', 'layout', 'components', 'responsive'];
+      cssFiles.forEach(function(name) {
+        var link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = './css/' + name + '.css?v=' + BUILD_VERSION;
+        document.head.appendChild(link);
+      });
+
+      // 版本检测与缓存失效
+      var BUILD_KEY = 'lion-hub-build-v1';
+      var STALE_KEY = 'stale';
+      var savedBuild = sessionStorage.getItem(BUILD_KEY);
+      if (savedBuild && savedBuild !== BUILD_VERSION) {
+        sessionStorage.setItem(STALE_KEY, '1');
+      } else {
+        sessionStorage.removeItem(STALE_KEY);
+      }
+      sessionStorage.setItem(BUILD_KEY, BUILD_VERSION);
+
+      var LAST_VERSION_CHECK = 0;
+      document.addEventListener('click', function(e) {
+        if (sessionStorage.getItem(STALE_KEY) === '1') {
+          alert('检测到新版本，请刷新页面以加载最新内容。');
+          e.stopPropagation();
+          e.preventDefault();
+          return;
+        }
+        var now = Date.now();
+        if (now - LAST_VERSION_CHECK < 60000) return;
+        LAST_VERSION_CHECK = now;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/index.html?t=' + now, true);
+        xhr.onload = function() {
+          if (xhr.status === 200) {
+            var match = xhr.responseText.match(/var BUILD_VERSION\s*=\s*'([^']+)'/);
+            if (match) {
+              var serverBuild = match[1];
+              var localBuild = sessionStorage.getItem(BUILD_KEY);
+              if (localBuild && localBuild !== serverBuild) {
+                sessionStorage.setItem(BUILD_KEY, serverBuild);
+                sessionStorage.setItem(STALE_KEY, '1');
+              } else {
+                sessionStorage.removeItem(STALE_KEY);
+              }
+            }
+          }
+        };
+        xhr.onerror = xhr.onabort = function() {};
+        xhr.send();
+      }, true);
+    })();
+  </script>
+</head>
+<body>
+  <div class="app-shell" id="app">
+    <div class="boot-screen" id="boot-screen">
+      <div class="boot-panel glass-card">
+        <div class="boot-mark">Lion Hub</div>
+        <h1>醒狮战队协作中枢</h1>
+        <p>正在装载成员、任务、审核与积分数据...</p>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function() {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js?v=' + window.BUILD_VERSION)
+          .then(function(reg) {
+            console.log('[SW] registered:', reg.scope);
+          })
+          .catch(function(err) {
+            console.warn('[SW] registration failed:', err);
+          });
+      }
+    })();
+  </script>
+  <script>
+    (function() {
+      var script = document.createElement('script');
+      script.type = 'module';
+      script.src = './app.js?v=' + window.BUILD_VERSION;
+      document.body.appendChild(script);
+    })();
+  </script>
+</body>
+</html>
