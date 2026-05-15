@@ -17,8 +17,8 @@ else
   echo "[i] Server is not running"
 fi
 
-# 2. Stage database and backups
-git add data/lion_hub.db data/backups/
+# 2. Stage entire data directory
+git add data/
 
 # 3. Commit
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
