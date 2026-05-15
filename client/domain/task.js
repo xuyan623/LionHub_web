@@ -143,25 +143,14 @@ export async function handleProgressNoteForm(form) {
   if (!task || !canInteractWithTasks()) return;
   const formData = new FormData(form);
   const note = String(formData.get("note") || "").trim();
-  const selectedFiles = getSelectedUploadFiles(formData.getAll("attachments"));
-  if (!note && !selectedFiles.length) { pushFlash("进度说明和附件至少填写一项。", "info"); return; }
-
-  let uploadedAttachments = [];
-  if (selectedFiles.length) {
-    try {
-      uploadedAttachments = await uploadLocalAttachments(task.id, selectedFiles, "progress_note");
-    } catch (error) {
-      pushFlash(error instanceof Error ? error.message : "附件上传失败，请稍后重试。", "info");
-      return;
-    }
-  }
+  if (!note) { pushFlash("请填写进度说明。", "info"); return; }
 
   const node = {
     id: uid("node"),
     taskId: task.id,
     percent: task.progressPercent,
     note,
-    attachments: uploadedAttachments,
+    attachments: [],
     createdAt: new Date().toISOString(),
     authorId: getCurrentMember().id,
   };

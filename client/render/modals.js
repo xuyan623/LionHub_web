@@ -735,7 +735,6 @@ function renderProgressNoteFormModal() {
         <form class="auth-form" data-form="progress-note-form" data-task-id="${task.id}">
           <input type="hidden" name="progressPercent" value="${task.progressPercent}">
           <label class="field-group"><span class="field-label">进度说明</span><textarea class="field-textarea" name="note" placeholder="描述当前完成的工作、遇到的问题或下一步计划" style="min-height:100px"></textarea></label>
-          <label class="field-group"><span class="field-label">附件上传（可选）</span><input class="field-input field-file-input" type="file" name="attachments" multiple onchange="this.nextElementSibling.textContent = this.files.length > 5 ? '单次最多上传 5 个文件。' : ''"><span class="helper-text file-count-warn" style="color:var(--danger)"></span></label>
           <div class="button-row">
             <button class="button-primary" type="submit" ${state.formLoading === 'progress-note-form' ? 'disabled' : ''}>保存进度说明</button>
             <button class="button-ghost" type="button" data-action="close-overlay">取消</button>
