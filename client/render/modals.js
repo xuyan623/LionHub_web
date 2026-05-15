@@ -5,8 +5,9 @@ import { loadDraft, getDraftKey } from "../core/drafts.js";
 import { getCurrentUser, getCurrentMember, getMemberById, getTaskById, getApprovalById, getTaskParticipantRecords, getActiveParticipantCount, getMemberPointSummary, getMemberLoads, getMemberTimeline, getTaskParticipantRecordsByMember, getJoinActionLabel, getLifecycleActionDefinition } from "../domain/query.js";
 import { getLatestSubmissionSummary, getSubmissionAttachments } from "../domain/task.js";
 import { canReview, canDeleteAllGeneratedData, canEditTask, canDeleteTask, canDeleteApprovalRecord, canInteractWithTasks, canMemberBeAddedToTask, isRetiredMember, isDisabledMember, getLifecycleBlockingTasks, canRequestRoleChange, isAdmin } from "../domain/permissions.js";
-import { renderEmpty, renderTimelineCard, renderTaskCard, renderAttachmentCard, renderStatusBadge, renderPointPill, renderMemberDetail, renderSelectOptions, renderFilterField, renderFilterSelect } from "./components.js";
+import { renderEmpty, renderTimelineCard, renderTaskCard, renderAttachmentCard, renderStatusBadge, renderPointPill, renderMemberDetail, renderSelectOptions, renderMultiSelectOptions, renderFilterField, renderFilterSelect } from "./components.js";
 import { renderTaskDetail, renderCompensationPanel, renderRatioPanel } from "./task-detail.js";
+import { toArray, joinOr } from "../core/utils.js";
 
 export function renderModal() {
   switch (state.modal.type) {
@@ -270,7 +271,7 @@ function renderShareTaskModal() {
     `状态：${statusText}`,
     `优先级：${priorityText}　难度：${difficultyText}`,
     `类型：${typeText}`,
-    `部门：${task.department}　方向：${task.direction || "未指定"}　兵种：${task.robotGroup || "通用"}`,
+    `部门：${joinOr(task.departments || task.department, "未指定")}　方向：${joinOr(task.directions || task.direction, "未指定")}　兵种：${joinOr(task.robotGroups || task.robotGroup, "通用")}`,
     `负责人：${owner?.name || "未设置"}`,
     `截止日期：${dueText}`,
     `人数：${getActiveParticipantCount(task.id)} / ${task.maxParticipants}`,
@@ -327,9 +328,9 @@ function renderTaskFormModal() {
             <label class="field-group"><span class="field-label">任务类型</span><select class="field-select" name="type" required>${renderSelectOptions(options.taskTypes, task?.type, dictionaries.taskTypes)}</select></label>
           </div>
           <div class="field-grid-3">
-            <label class="field-group"><span class="field-label">所属部门</span><select class="field-select" name="department" required>${renderSelectOptions(options.departments, task?.department)}</select></label>
-            <label class="field-group"><span class="field-label">所属方向</span><select class="field-select" name="direction"><option value="">未指定</option>${renderSelectOptions(options.directions, task?.direction)}</select></label>
-            <label class="field-group"><span class="field-label">所属兵种</span><select class="field-select" name="robotGroup"><option value="">未指定</option>${renderSelectOptions(options.robotGroups, task?.robotGroup)}</select></label>
+            <label class="field-group"><span class="field-label">所属部门</span><select class="field-select" name="departments" multiple required>${renderMultiSelectOptions(options.departments, toArray(task?.departments || task?.department))}</select></label>
+            <label class="field-group"><span class="field-label">所属方向</span><select class="field-select" name="directions" multiple>${renderMultiSelectOptions(options.directions, toArray(task?.directions || task?.direction))}</select></label>
+            <label class="field-group"><span class="field-label">所属兵种</span><select class="field-select" name="robotGroups" multiple>${renderMultiSelectOptions(options.robotGroups, toArray(task?.robotGroups || task?.robotGroup))}</select></label>
           </div>
           <div class="field-grid-3">
             ${canDeleteAllGeneratedData() ? `

@@ -1,5 +1,6 @@
 import { state, dictionaries, routes } from "../core/state.js";
 import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecordsByMember } from "../core/member-state.js";
+import { toArray } from "../core/utils.js";
 
 export function getRoleForIdentity(identity) {
   return dictionaries.identityRoleMap[identity] || "seedling";
@@ -156,9 +157,9 @@ export function doesTaskFallWithinMemberScope(task, member = getCurrentMember())
   if (task.ownerId === member.id || task.creatorId === member.id) {
     return true;
   }
-  return matchesSingleScopeValue(task.department, member.departments)
-    || matchesSingleScopeValue(task.direction, member.directions)
-    || matchesSingleScopeValue(task.robotGroup, member.robotGroups);
+  return toArray(task.departments || task.department).some((d) => matchesSingleScopeValue(d, member.departments))
+    || toArray(task.directions || task.direction).some((d) => matchesSingleScopeValue(d, member.directions))
+    || toArray(task.robotGroups || task.robotGroup).some((d) => matchesSingleScopeValue(d, member.robotGroups));
 }
 
 export function doesMemberFallWithinMemberScope(targetMember, member = getCurrentMember()) {

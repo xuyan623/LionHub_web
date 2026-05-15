@@ -1,6 +1,6 @@
 import { state } from "../core/state.js";
 import { uid } from "../core/security.js";
-import { createComment, parseList, clamp, roundPointFromSettings } from "../core/utils.js";
+import { createComment, parseList, clamp, roundPointFromSettings, toArray } from "../core/utils.js";
 import { addRecord, removeRecord, removeWhere } from "../core/data-access.js";
 import { saveDatabase } from "../core/database.js";
 import { pushModal, popModal, clearModalStack } from "../core/modal.js";
@@ -45,9 +45,9 @@ export async function handleTaskForm(form) {
   const payload = {
     title: String(formData.get("title") || "").trim(),
     type: String(formData.get("type") || "research"),
-    department: String(formData.get("department") || "").trim(),
-    direction: String(formData.get("direction") || "").trim(),
-    robotGroup: String(formData.get("robotGroup") || "").trim(),
+    departments: formData.getAll("departments").filter(Boolean),
+    directions: formData.getAll("directions").filter(Boolean),
+    robotGroups: formData.getAll("robotGroups").filter(Boolean),
     priority: String(formData.get("priority") || "medium"),
     difficulty: String(formData.get("difficulty") || "normal"),
     dueAt: String(formData.get("dueAt") || "").trim(),
@@ -62,7 +62,7 @@ export async function handleTaskForm(form) {
     tags: parseList(String(formData.get("tags") || "")),
   };
 
-  if (!payload.title || !payload.department || !payload.dueAt || !payload.description || !payload.recommendedFor) {
+  if (!payload.title || !payload.departments.length || !payload.dueAt || !payload.description || !payload.recommendedFor) {
     pushFlash("任务字段未填写完整，无法保存。", "info"); return;
   }
 

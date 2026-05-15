@@ -46,3 +46,14 @@ export function roundPointFromSettings(value) {
   const precision = state?.database?.settings?.pointPrecision ?? 1;
   return parseFloat(value.toFixed(precision));
 }
+
+export function toArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string" && value) return [value];
+  return [];
+}
+
+export function joinOr(arr, fallback = "通用") {
+  const list = toArray(arr);
+  return list.length ? list.join(" / ") : fallback;
+}

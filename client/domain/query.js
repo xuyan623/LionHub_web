@@ -1,6 +1,6 @@
 import { state, dictionaries, routes, FILES_PER_PAGE } from "../core/state.js";
 import { escapeHtml } from "../core/security.js";
-import { parseList, clamp, roundPointFromSettings } from "../core/utils.js";
+import { parseList, clamp, roundPointFromSettings, toArray } from "../core/utils.js";
 import {
   getCurrentUser,
   getCurrentMember,
@@ -183,9 +183,9 @@ export function getFilteredMarketTasks() {
     if (state.marketFilters.type !== "all" && !((state.marketFilters.type === "emergency" && isUrgentMarketTask(task)) || task.type === state.marketFilters.type)) {
       return false;
     }
-    if (state.marketFilters.department !== "all" && task.department !== state.marketFilters.department) return false;
-    if (state.marketFilters.direction !== "all" && task.direction !== state.marketFilters.direction) return false;
-    if (state.marketFilters.robotGroup !== "all" && task.robotGroup !== state.marketFilters.robotGroup) return false;
+    if (state.marketFilters.department !== "all" && !toArray(task.departments || task.department).includes(state.marketFilters.department)) return false;
+    if (state.marketFilters.direction !== "all" && !toArray(task.directions || task.direction).includes(state.marketFilters.direction)) return false;
+    if (state.marketFilters.robotGroup !== "all" && !toArray(task.robotGroups || task.robotGroup).includes(state.marketFilters.robotGroup)) return false;
     if (state.marketFilters.difficulty !== "all" && task.difficulty !== state.marketFilters.difficulty) return false;
     if (state.marketFilters.status !== "all" && task.status !== state.marketFilters.status) return false;
     if (audienceQuery && !task.recommendedFor.toLowerCase().includes(audienceQuery)) return false;
@@ -210,7 +210,7 @@ export function getCurrentUserTaskRecords() {
 export function getVisibleTaskManagementTasks() {
   const member = getCurrentMember();
   if (member.role === "admin") return [...state.database.tasks];
-  if (member.role === "leader") return state.database.tasks.filter((task) => member.departments.includes(task.department) || member.directions.includes(task.direction));
+  if (member.role === "leader") return state.database.tasks.filter((task) => toArray(task.departments || task.department).some((d) => member.departments.includes(d)) || toArray(task.directions || task.direction).some((d) => member.directions.includes(d)));
   return state.database.tasks.filter((task) => task.creatorId === member.id || task.ownerId === member.id);
 }
 
@@ -256,9 +256,12 @@ export function getDepartmentContribution() {
 export function getRobotContribution() {
   const totals = new Map();
   state.database.tasks.forEach((task) => {
-    const key = task.robotGroup || "通用";
+    const groups = toArray(task.robotGroups || task.robotGroup);
+    const keys = groups.length ? groups : ["通用"];
     const sum = task.studyPoints + task.laborPoints + task.managementPoints;
-    totals.set(key, (totals.get(key) || 0) + sum);
+    keys.forEach((key) => {
+      totals.set(key, (totals.get(key) || 0) + sum);
+    });
   });
   return [...totals.entries()].map(([label, value]) => ({ label, value: roundPointFromSettings(value) })).sort((left, right) => right.value - left.value);
 }
@@ -283,7 +286,7 @@ export function getApprovalGroups() {
     if (currentMember.role === "leader") {
       if (approval.type === "join" || approval.type === "completion") {
         const task = getTaskById(approval.targetId);
-        return task && (currentMember.departments.includes(task.department) || currentMember.directions.includes(task.direction));
+        return task && (toArray(task.departments || task.department).some((d) => currentMember.departments.includes(d)) || toArray(task.directions || task.direction).some((d) => currentMember.directions.includes(d)));
       }
       return approval.type === "promotion" || approval.type === "status_change";
     }

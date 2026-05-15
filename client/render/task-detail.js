@@ -1,6 +1,7 @@
 import { state, dictionaries, options } from "../core/state.js";
 import { escapeHtml, escapeAttribute } from "../core/security.js";
 import { formatDateTime, formatShortDate } from "../core/format.js";
+import { toArray, joinOr } from "../core/utils.js";
 import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecords, getActiveParticipantCount, getJoinActionLabel } from "../domain/query.js";
 import { canEditTask, canDeleteAllGeneratedData, canInteractWithTasks, isAdmin, isRetiredMember, isDisabledMember, canMemberBeAddedToTask, canDeleteTaskGeneratedData } from "../domain/permissions.js";
 import { renderStatusBadge, renderPointPill, renderEmpty, renderCommentCard, renderAttachmentCard, renderParticipantRow, renderTaskCard, renderProgressNodeCard } from "./components.js";
@@ -57,7 +58,7 @@ function renderTaskTable(tasks) {
             <td>${renderStatusBadge(task.status)}</td>
             <td><span class="priority-pill">${escapeHtml(dictionaries.priorities[task.priority])}</span></td>
             <td><span class="mini-pill">${escapeHtml(dictionaries.difficulties[task.difficulty])}</span></td>
-            <td>${escapeHtml(task.department)} / ${escapeHtml(task.robotGroup || "通用")}</td>
+            <td>${escapeHtml(joinOr(task.departments || task.department, "未指定"))} / ${escapeHtml(joinOr(task.robotGroups || task.robotGroup, "通用"))}</td>
             <td>${formatShortDate(task.dueAt)}</td>
             <td>${getActiveParticipantCount(task.id)} / ${task.maxParticipants}</td>
             <td><button class="button-ghost" type="button" data-action="open-task" data-task-id="${task.id}">查看</button></td>
@@ -102,7 +103,7 @@ function renderTaskCalendar(tasks) {
 
 function renderTaskRobotView(tasks) {
   return `<div class="robot-grid">${options.robotGroups.map((robotGroup) => {
-    const items = tasks.filter((task) => task.robotGroup === robotGroup);
+    const items = tasks.filter((task) => toArray(task.robotGroups || task.robotGroup).includes(robotGroup));
     return `<section class="panel robot-column"><div class="section-header"><div><h3>${robotGroup}</h3><p>按兵种聚合任务。</p></div></div>${items.length ? items.map((task) => renderTaskCard(task, { compact: true })).join("") : renderEmpty("暂无关联任务")}</section>`;
   }).join("")}</div>`;
 }
@@ -132,7 +133,7 @@ export function renderTaskDetail(task) {
       </div>
       <div class="definition-list">
         <div class="definition-row"><span>任务类型</span><strong>${escapeHtml(dictionaries.taskTypes[task.type])}</strong></div>
-        <div class="definition-row"><span>部门 / 方向 / 兵种</span><strong>${escapeHtml(task.department)} / ${escapeHtml(task.direction || "未指定")} / ${escapeHtml(task.robotGroup || "通用")}</strong></div>
+        <div class="definition-row"><span>部门 / 方向 / 兵种</span><strong>${escapeHtml(joinOr(task.departments || task.department, "未指定"))} / ${escapeHtml(joinOr(task.directions || task.direction, "未指定"))} / ${escapeHtml(joinOr(task.robotGroups || task.robotGroup, "通用"))}</strong></div>
         <div class="definition-row"><span>负责人</span><strong>${escapeHtml(getMemberById(task.ownerId)?.name || "未设置")}</strong></div>
         <div class="definition-row"><span>截止日期</span><strong>${formatDateTime(task.dueAt)}</strong></div>
         <div class="definition-row"><span>推荐人群</span><strong>${escapeHtml(task.recommendedFor)}</strong></div>

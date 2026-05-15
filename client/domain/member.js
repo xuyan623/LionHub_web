@@ -1,6 +1,6 @@
 import { state, dictionaries } from "../core/state.js";
 import { uid, hashPassword } from "../core/security.js";
-import { parseList, clamp } from "../core/utils.js";
+import { parseList, clamp, toArray, joinOr } from "../core/utils.js";
 import { saveDatabase, saveSession } from "../core/database.js";
 import { clearModalStack, popModal } from "../core/modal.js";
 import { getRoleForIdentity, ensureVisibleRoute, canDeleteAllGeneratedData, canMemberParticipateInTasks, isRetiredMember, isDisabledMember, getLifecycleBlockingTasks } from "./permissions.js";
@@ -153,7 +153,7 @@ export async function exportTasksCsv() {
   const rows = [["标题","类型","状态","优先级","难度","部门","兵种","截止日期","负责人","进度"]];
   state.database.tasks.forEach((t) => {
     const owner = getMemberById(t.ownerId);
-    rows.push([t.title, dictionaries.taskTypes[t.type] || t.type, dictionaries.taskStatuses[t.status] || t.status, dictionaries.priorities[t.priority] || t.priority, dictionaries.difficulties[t.difficulty] || t.difficulty, t.department, t.robotGroup || "通用", t.dueAt ? new Date(t.dueAt).toLocaleDateString("zh-CN") : "", owner?.name || "", `${t.progressPercent}%`]);
+    rows.push([t.title, dictionaries.taskTypes[t.type] || t.type, dictionaries.taskStatuses[t.status] || t.status, dictionaries.priorities[t.priority] || t.priority, dictionaries.difficulties[t.difficulty] || t.difficulty, joinOr(t.departments || t.department, ""), joinOr(t.robotGroups || t.robotGroup, "通用"), t.dueAt ? new Date(t.dueAt).toLocaleDateString("zh-CN") : "", owner?.name || "", `${t.progressPercent}%`]);
   });
   downloadCsv("任务列表.csv", rows);
 }

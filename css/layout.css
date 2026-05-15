@@ -207,6 +207,22 @@
   color-scheme: dark;
 }
 
+.field-select[multiple] {
+  min-height: 80px;
+  padding: 8px 10px;
+}
+
+.field-select[multiple] option {
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin-bottom: 1px;
+}
+
+.field-select[multiple] option:checked {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text);
+}
+
 .share-textarea {
   min-height: 380px;
   font-family: "SF Mono", "Consolas", monospace;

@@ -1,7 +1,7 @@
 import { state, dictionaries, options, FILES_PER_PAGE } from "../core/state.js";
 import { escapeHtml, escapeAttribute } from "../core/security.js";
 import { formatDateTime, formatShortDate } from "../core/format.js";
-import { truncate, getInitials } from "../core/utils.js";
+import { truncate, getInitials, toArray, joinOr } from "../core/utils.js";
 import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecords, getTaskParticipantRecordsByMember, getMemberPointSummary, getMemberLoads, getActiveParticipantCount, getJoinActionLabel, getApprovalById, getAttachmentsIndex } from "../domain/query.js";
 import { canReview, canDeleteAllGeneratedData, canDeleteTaskGeneratedData, canInteractWithTasks, canDeletePointTransaction, canDeleteApprovalRecord, isAdmin, isRetiredMember, isDisabledMember, canMemberBeAddedToTask, getLifecycleBlockingTasks, isTaskOpenStatus } from "../domain/permissions.js";
 
@@ -10,6 +10,15 @@ export function renderSelectOptions(values, selectedValue = "", labels = null) {
     const selected = value === selectedValue ? "selected" : "";
     const label = labels ? labels[value] : value;
     return `<option value="${escapeAttribute(value)}" ${selected}>${escapeHtml(label)}</option>`;
+  }).join("");
+}
+
+export function renderMultiSelectOptions(values, selectedValues = [], labels = null) {
+  const selected = new Set(Array.isArray(selectedValues) ? selectedValues : (selectedValues ? [selectedValues] : []));
+  return values.map((value) => {
+    const isSelected = selected.has(value) ? "selected" : "";
+    const label = labels ? labels[value] : value;
+    return `<option value="${escapeAttribute(value)}" ${isSelected}>${escapeHtml(label)}</option>`;
   }).join("");
 }
 
@@ -84,7 +93,7 @@ export function renderTaskCard(task, config = {}) {
         <button class="button-ghost" type="button" data-action="open-task" data-task-id="${task.id}">详情</button>
       </div>
       <div class="task-meta">
-        <span>${escapeHtml(task.department)}</span><span>${escapeHtml(task.direction || "未指定方向")}</span><span>${escapeHtml(task.robotGroup || "通用")}</span><span>${escapeHtml(dictionaries.difficulties[task.difficulty])}</span>
+        <span>${escapeHtml(joinOr(task.departments || task.department, "未指定"))}</span><span>${escapeHtml(joinOr(task.directions || task.direction, "未指定方向"))}</span><span>${escapeHtml(joinOr(task.robotGroups || task.robotGroup, "通用"))}</span><span>${escapeHtml(dictionaries.difficulties[task.difficulty])}</span>
       </div>
       ${config.compact ? "" : `<p class="text-block">${escapeHtml(truncate(task.description, 92))}</p>`}
       <div class="task-points">
@@ -129,7 +138,7 @@ export function renderMemberCard(member, config = {}) {
 }
 
 export function renderProjectCard(project, expanded = false) {
-  const relatedTasks = state.database.tasks.filter((task) => task.robotGroup === project.name).slice(0, expanded ? 4 : 2);
+  const relatedTasks = state.database.tasks.filter((task) => toArray(task.robotGroups || task.robotGroup).includes(project.name)).slice(0, expanded ? 4 : 2);
   return `
     <div class="project-card">
       <div class="project-top">
