@@ -58,7 +58,6 @@ export async function handleSettingsForm(form) {
   state.database.settings.middleJoinDiscount = clamp(Number(formData.get("middleJoinDiscount") || 0.5), 0, 1);
   state.database.settings.overduePointDiscount = clamp(Number(formData.get("overduePointDiscount") || 0.5), 0, 1);
   state.database.settings.pointPrecision = Math.round(clamp(Number(formData.get("pointPrecision") || 1), 0, 2));
-  state.database.settings.allowLeaveClaim = String(formData.get("allowLeaveClaim") || "true") === "true";
   state.database.settings.hardTaskNeedsApproval = String(formData.get("hardTaskNeedsApproval") || "true") === "true";
   if (!(await saveDatabase())) return;
   pushFlash("系统设置已保存。", "info");

@@ -103,7 +103,6 @@ export async function rejectRegistration(approvalId) {
   approval.approverId = getCurrentMember().id;
   approval.reviewedAt = new Date().toISOString();
   approval.comment = "注册审核未通过";
-  if (member) member.memberStatus = "paused";
   if (user) user.status = "rejected";
   // Notify the rejected applicant
   if (user) {

@@ -41,8 +41,6 @@ export const dictionaries = {
     normal: "正常",
     retired: "已退休",
     disabled: "已停用",
-    leave: "请假中",
-    paused: "暂停活动",
     exited: "已退出",
   },
   taskStatuses: {

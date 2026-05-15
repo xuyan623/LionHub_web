@@ -70,7 +70,6 @@ def build_initial_database() -> dict[str, Any]:
         "settings": {
             "middleJoinDiscount": 0.5,
             "pointPrecision": 1,
-            "allowLeaveClaim": True,
             "hardTaskNeedsApproval": True,
         },
     }

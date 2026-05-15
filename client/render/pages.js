@@ -21,7 +21,7 @@ export function renderDashboardPage() {
         <div><h2>仪表盘</h2><p>总览成员负载、精选任务、积分排行与兵种项目进展，优先暴露管理层最关心的运行信号。</p></div>
       </div>
       <div class="metric-grid">
-        ${renderMetricCard("当前成员数", stats.memberCount, "包含正常、请假中和暂停活动成员")}
+        ${renderMetricCard("当前成员数", stats.memberCount, "包含正常状态成员")}
         ${renderMetricCard("进行中任务", stats.inProgressCount, "当前正在推进的公开任务与项目任务")}
         ${renderMetricCard("待审核任务", stats.pendingReviewCount, "已提交成果等待审核与结算")}
         ${renderMetricCard("已逾期任务", stats.overdueCount, "截止日期已过且未完成的任务")}
@@ -332,7 +332,6 @@ export function renderSettingsPage() {
           <label class="field-group"><span class="field-label">点数保留位数</span><input class="field-input" type="number" min="0" max="2" step="1" name="pointPrecision" required value="${escapeAttribute(String(settings.pointPrecision))}"></label>
         </div>
         <div class="field-grid">
-          <label class="field-group"><span class="field-label">请假成员允许主动加入任务</span><select class="field-select" name="allowLeaveClaim" required><option value="true" ${settings.allowLeaveClaim ? "selected" : ""}>允许</option><option value="false" ${!settings.allowLeaveClaim ? "selected" : ""}>不允许</option></select></label>
           <label class="field-group"><span class="field-label">是否对高难任务强制审批</span><select class="field-select" name="hardTaskNeedsApproval" required><option value="true" ${settings.hardTaskNeedsApproval ? "selected" : ""}>强制审批</option><option value="false" ${!settings.hardTaskNeedsApproval ? "selected" : ""}>可手动关闭</option></select></label>
         </div>
         <div class="button-row"><button class="button-primary" type="submit" ${state.formLoading === 'settings' ? 'disabled' : ''}>保存设置</button></div>
