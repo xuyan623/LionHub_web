@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import mimetypes
+import sqlite3
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -99,6 +100,18 @@ def _check_rate_limit(ip: str) -> bool:
     except sqlite3.Error as error:
         print(f"Rate limit DB error: {error}")
         return True
+
+
+CACHE_CONTROL_NO_CACHE = "no-cache, no-store, must-revalidate"
+STATIC_CACHE_EXTENSIONS = {".css", ".js", ".html"}
+
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-XSS-Protection": "1; mode=block",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+}
 
 
 def _get_client_ip(request: Request) -> str:

@@ -21,3 +21,4 @@ Thumbs.db
 server_stderr.txt
 server_stdout.txt
 uvicorn_log.txt
+uvicorn.err
