@@ -1,1 +1,5 @@
-export { renderSettingsPage as render } from "../pages.js";
+import { renderSettingsPage } from "../pages.js";
+
+export function render() {
+  return renderSettingsPage();
+}

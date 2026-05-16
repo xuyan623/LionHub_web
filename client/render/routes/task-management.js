@@ -1,1 +1,5 @@
-export { renderTaskManagementPage as render } from "../pages.js";
+import { renderTaskManagementPage } from "../pages.js";
+
+export function render() {
+  return renderTaskManagementPage();
+}

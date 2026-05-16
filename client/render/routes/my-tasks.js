@@ -1,1 +1,5 @@
-export { renderMyTasksPage as render } from "../pages.js";
+import { renderMyTasksPage } from "../pages.js";
+
+export function render() {
+  return renderMyTasksPage();
+}

@@ -51,6 +51,22 @@ const routePromises = new Map();
 const modalGroupModules = new Map();
 const modalGroupPromises = new Map();
 
+function hasCallableExport(module) {
+  if (!module) {
+    return false;
+  }
+  if (typeof module.render === "function") {
+    return true;
+  }
+  if (typeof module.default === "function") {
+    return true;
+  }
+  if (module.default && typeof module.default.render === "function") {
+    return true;
+  }
+  return Object.values(module).some((value) => typeof value === "function");
+}
+
 export function getLoadedWorkspaceRuntime() {
   return workspaceRuntimeModule;
 }
@@ -89,9 +105,16 @@ export function loadRouteChunk(routeId) {
   }
   const promise = routeLoaders[normalizedRoute]()
     .then((module) => {
+      if (!hasCallableExport(module)) {
+        throw new Error(`Route chunk "${normalizedRoute}" loaded without callable exports.`);
+      }
       routeModules.set(normalizedRoute, module);
       renderApp();
       return module;
+    })
+    .catch((error) => {
+      routeModules.delete(normalizedRoute);
+      throw error;
     })
     .finally(() => {
       routePromises.delete(normalizedRoute);
@@ -119,9 +142,16 @@ export function loadModalChunk(modalType) {
   }
   const promise = modalGroupLoaders[groupName]()
     .then((module) => {
+      if (!hasCallableExport(module)) {
+        throw new Error(`Modal chunk "${groupName}" loaded without callable exports.`);
+      }
       modalGroupModules.set(groupName, module);
       renderApp();
       return module;
+    })
+    .catch((error) => {
+      modalGroupModules.delete(groupName);
+      throw error;
     })
     .finally(() => {
       modalGroupPromises.delete(groupName);

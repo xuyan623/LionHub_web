@@ -14,8 +14,7 @@ const checkOnly = process.argv.includes("--check");
 
 const indexTemplate = await readFile(path.join(frontendDir, "index.html"), "utf8");
 const swTemplate = await readFile(path.join(frontendDir, "sw.js"), "utf8");
-const versionMatch = indexTemplate.match(/var BUILD_VERSION\s*=\s*'([^']+)'/);
-const buildVersion = versionMatch?.[1] || new Date().toISOString().replace(/[-:.TZ]/g, "");
+const buildVersion = process.env.LION_HUB_BUILD_VERSION?.trim() || createBuildVersion();
 
 if (!checkOnly) {
   await rm(distDir, { recursive: true, force: true });
@@ -54,6 +53,7 @@ const publicStylePath = toPublicPath(styleAsset);
 const staticAssets = ["/", "/index.html", publicBootstrapPath, publicStylePath];
 
 const builtIndex = indexTemplate
+  .replace(/__BUILD_VERSION__/g, buildVersion)
   .replace(/__APP_CSS__/g, publicStylePath)
   .replace(/__BOOTSTRAP_JS__/g, publicBootstrapPath);
 
@@ -133,4 +133,8 @@ async function collectFiles(dirPath) {
 function shouldCompressFile(filePath) {
   const extension = path.extname(filePath).toLowerCase();
   return [".css", ".html", ".js", ".json", ".map", ".svg", ".txt"].includes(extension);
+}
+
+function createBuildVersion() {
+  return `build-${new Date().toISOString().replace(/[-:.TZ]/g, "")}`;
 }

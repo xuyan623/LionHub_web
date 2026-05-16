@@ -1,1 +1,5 @@
-export { renderMarketPage as render } from "../pages.js";
+import { renderMarketPage } from "../pages.js";
+
+export function render() {
+  return renderMarketPage();
+}
