@@ -503,63 +503,31 @@ export async function removeTaskParticipant(taskId, memberId) { return removeTas
 export async function handleTaskOwnerReassignForm(form) { return handleTaskOwnerReassignFormAction(form); }
 
 export function settleTaskPoints(task) {
-  const participants = getTaskParticipantRecords(task.id).filter((item) => item.status !== "exited");
-  if (!participants.length) return;
-
-  const wasOverdue = task.dueAt && new Date(task.dueAt).getTime() < new Date(task.submittedAt || task.completedAt || new Date().toISOString()).getTime();
-  const overdueDiscount = wasOverdue ? (state.database.settings.overduePointDiscount ?? 0.5) : 1;
-  const middleJoinDiscount = state.database.settings.middleJoinDiscount ?? 0.5;
-  const now = new Date().toISOString();
-  const operatorId = getCurrentMember().id;
-
-  const weighted = participants.map((participant) => ({
-    participant,
-    weight: participant.contributionRatio * (participant.joinType === "middle" ? middleJoinDiscount : 1) * overdueDiscount,
-  }));
-  const totalWeight = weighted.reduce((sum, item) => sum + item.weight, 0);
-  if (!totalWeight || totalWeight <= 0) {
+  const preview = buildTaskSettlementPreview(task);
+  if (!preview.memberSettlements.length) {
+    return;
+  }
+  if (!preview.totalWeight || preview.totalWeight <= 0) {
     console.error("settleTaskPoints: totalWeight is zero or invalid, aborting.");
     return;
   }
 
-  // Phase 1: pre-calculate all transactions in memory
-  const pendingTransactions = [];
-  for (const { participant, weight } of weighted) {
-    const targetMember = getMemberById(participant.memberId);
-    if (!canMemberAccruePoints(targetMember)) continue;
-
-    const studyAmount = roundPointFromSettings((task.studyPoints * weight) / totalWeight);
-    const laborAmount = roundPointFromSettings((task.laborPoints * weight) / totalWeight);
-
-    if (studyAmount < 0 || laborAmount < 0) {
-      console.error("settleTaskPoints: negative amount detected, aborting.");
-      return;
-    }
-
-    pendingTransactions.push(
-      { id: uid("point"), memberId: participant.memberId, taskId: task.id, type: "study", amount: studyAmount, reason: `${task.title} 研习点结算`, operatorId, createdAt: now },
-      { id: uid("point"), memberId: participant.memberId, taskId: task.id, type: "labor", amount: laborAmount, reason: `${task.title} 工时点结算`, operatorId, createdAt: now }
-    );
-  }
-
-  if (task.managementPoints > 0) {
-    const ownerMember = getMemberById(task.ownerId);
-    if (canMemberAccruePoints(ownerMember)) {
-      const managementAmount = roundPointFromSettings(task.managementPoints * overdueDiscount);
-      if (managementAmount < 0) {
-        console.error("settleTaskPoints: negative management amount detected, aborting.");
-        return;
-      }
-      pendingTransactions.push(
-        { id: uid("point"), memberId: task.ownerId, taskId: task.id, type: "management", amount: managementAmount, reason: `${task.title} 管理点结算`, operatorId, createdAt: now }
-      );
-    }
-  }
-
-  // Phase 2: atomic batch insert — if any step above failed, nothing reaches here
-  for (const transaction of pendingTransactions) {
+  for (const transaction of preview.pendingTransactions) {
     addRecord("pointTransactions", transaction);
   }
+}
+
+export function getTaskSettlementPreview(task) {
+  const preview = buildTaskSettlementPreview(task);
+  return {
+    memberSettlements: preview.memberSettlements,
+    middleJoinDiscount: preview.middleJoinDiscount,
+    overdueDiscount: preview.overdueDiscount,
+    pendingTransactions: preview.pendingTransactions,
+    totalWeight: preview.totalWeight,
+    totals: preview.totals,
+    wasOverdue: preview.wasOverdue,
+  };
 }
 
 export async function handleCompensationForm(form) {
@@ -606,4 +574,134 @@ export async function deletePointTransaction(pointId) {
 
 function getSelectedUploadFiles(values) {
   return values.filter((value) => value instanceof File && value.size > 0);
+}
+
+function buildTaskSettlementPreview(task) {
+  const participants = getTaskParticipantRecords(task.id).filter((item) => item.status !== "exited");
+  if (!participants.length) {
+    return {
+      memberSettlements: [],
+      middleJoinDiscount: state.database.settings.middleJoinDiscount ?? 0.5,
+      overdueDiscount: 1,
+      pendingTransactions: [],
+      totalWeight: 0,
+      totals: { study: 0, labor: 0, management: 0, total: 0 },
+      wasOverdue: false,
+    };
+  }
+
+  const wasOverdue = task.dueAt && new Date(task.dueAt).getTime() < new Date(task.submittedAt || task.completedAt || new Date().toISOString()).getTime();
+  const overdueDiscount = wasOverdue ? (state.database.settings.overduePointDiscount ?? 0.5) : 1;
+  const middleJoinDiscount = state.database.settings.middleJoinDiscount ?? 0.5;
+  const now = new Date().toISOString();
+  const operatorId = getCurrentMember().id;
+
+  const weightedParticipants = participants.map((participant) => ({
+    participant,
+    member: getMemberById(participant.memberId),
+    weight: participant.contributionRatio * (participant.joinType === "middle" ? middleJoinDiscount : 1) * overdueDiscount,
+  }));
+  const totalWeight = weightedParticipants.reduce((sum, item) => sum + item.weight, 0);
+  const pendingTransactions = [];
+  const memberSettlements = [];
+
+  for (const { participant, member, weight } of weightedParticipants) {
+    const eligible = canMemberAccruePoints(member);
+    const studyAmount = eligible && totalWeight > 0 ? roundPointFromSettings((task.studyPoints * weight) / totalWeight) : 0;
+    const laborAmount = eligible && totalWeight > 0 ? roundPointFromSettings((task.laborPoints * weight) / totalWeight) : 0;
+
+    if (studyAmount < 0 || laborAmount < 0) {
+      console.error("buildTaskSettlementPreview: negative amount detected, aborting preview.");
+      return {
+        memberSettlements: [],
+        middleJoinDiscount,
+        overdueDiscount,
+        pendingTransactions: [],
+        totalWeight: 0,
+        totals: { study: 0, labor: 0, management: 0, total: 0 },
+        wasOverdue,
+      };
+    }
+
+    if (eligible) {
+      pendingTransactions.push(
+        { id: uid("point"), memberId: participant.memberId, taskId: task.id, type: "study", amount: studyAmount, reason: `${task.title} 研习点结算`, operatorId, createdAt: now },
+        { id: uid("point"), memberId: participant.memberId, taskId: task.id, type: "labor", amount: laborAmount, reason: `${task.title} 工时点结算`, operatorId, createdAt: now }
+      );
+    }
+
+    memberSettlements.push({
+      adjustedWeight: roundPointFromSettings(weight),
+      eligible,
+      joinType: participant.joinType,
+      laborAmount,
+      managementAmount: 0,
+      member,
+      participant,
+      studyAmount,
+      totalAmount: roundPointFromSettings(studyAmount + laborAmount),
+    });
+  }
+
+  if (task.managementPoints > 0) {
+    const ownerMember = getMemberById(task.ownerId);
+    const ownerEligible = canMemberAccruePoints(ownerMember);
+    const managementAmount = ownerEligible ? roundPointFromSettings(task.managementPoints * overdueDiscount) : 0;
+    if (managementAmount < 0) {
+      console.error("buildTaskSettlementPreview: negative management amount detected, aborting preview.");
+      return {
+        memberSettlements: [],
+        middleJoinDiscount,
+        overdueDiscount,
+        pendingTransactions: [],
+        totalWeight: 0,
+        totals: { study: 0, labor: 0, management: 0, total: 0 },
+        wasOverdue,
+      };
+    }
+    if (ownerEligible) {
+      pendingTransactions.push(
+        { id: uid("point"), memberId: task.ownerId, taskId: task.id, type: "management", amount: managementAmount, reason: `${task.title} 管理点结算`, operatorId, createdAt: now }
+      );
+    }
+
+    const ownerSettlement = memberSettlements.find((item) => item.member?.id === task.ownerId);
+    if (ownerSettlement) {
+      ownerSettlement.managementAmount = managementAmount;
+      ownerSettlement.totalAmount = roundPointFromSettings(ownerSettlement.studyAmount + ownerSettlement.laborAmount + managementAmount);
+    } else if (ownerMember) {
+      memberSettlements.push({
+        adjustedWeight: 0,
+        eligible: ownerEligible,
+        joinType: "initial",
+        laborAmount: 0,
+        managementAmount,
+        member: ownerMember,
+        participant: null,
+        studyAmount: 0,
+        totalAmount: managementAmount,
+      });
+    }
+  }
+
+  const totals = memberSettlements.reduce(
+    (summary, item) => {
+      summary.study = roundPointFromSettings(summary.study + item.studyAmount);
+      summary.labor = roundPointFromSettings(summary.labor + item.laborAmount);
+      summary.management = roundPointFromSettings(summary.management + item.managementAmount);
+      summary.total = roundPointFromSettings(summary.total + item.totalAmount);
+      return summary;
+    },
+    { study: 0, labor: 0, management: 0, total: 0 }
+  );
+
+  return {
+    memberSettlements,
+    middleJoinDiscount,
+    overdueDiscount,
+    pendingTransactions,
+    totalWeight,
+    totals,
+    wasOverdue,
+  };
 }

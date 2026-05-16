@@ -18,7 +18,7 @@ restart_server_if_needed() {
 
 trap 'status=$?; restart_server_if_needed; exit $status' EXIT
 
-echo "[*] Backing up database to GitHub..."
+echo "[*] Backing up /data directory to GitHub..."
 
 # 1. Stop server to ensure DB is not being written
 if [ -f ".server.pid" ] && kill -0 "$(cat ".server.pid")" 2>/dev/null; then
@@ -32,16 +32,16 @@ else
   echo "[i] Server is not running"
 fi
 
-# 2. Stage entire data directory
+# 2. Stage entire /data directory
 git add data/
 
 # 3. Commit
 TIMESTAMP=$(date "+%Y-%m-%d %H:%M:%S")
-git commit -m "Backup database: $TIMESTAMP" || { echo "[i] No changes to backup"; }
+git commit -m "Backup data directory: $TIMESTAMP" || { echo "[i] No changes to backup"; }
 
 # 4. Push
 git push origin master
-echo "[✓] Database pushed to GitHub"
+echo "[✓] /data directory pushed to GitHub"
 
 echo ""
-echo "[✓] Backup complete!"
+echo "[✓] /data backup complete!"

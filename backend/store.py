@@ -20,15 +20,18 @@ from .schemas import PersistenceConflictError
 class SharedDatabaseStore:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
-        self._lock = threading.Lock()
+        self._write_lock = threading.Lock()
         self._last_timestamped_backup_at: datetime | None = None
         self._version_history: list[tuple[int, dict]] = []
         self._MAX_HISTORY = 50
         self._ensure_schema()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.db_path)
+        connection = sqlite3.connect(self.db_path, timeout=5.0)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout = 5000")
+        connection.execute("PRAGMA journal_mode = WAL")
+        connection.execute("PRAGMA synchronous = NORMAL")
         return connection
 
     def _ensure_schema(self) -> None:
@@ -84,12 +87,11 @@ class SharedDatabaseStore:
         })
 
     def load_snapshot(self) -> dict[str, Any] | None:
-        with self._lock:
-            with self._connect() as connection:
-                self._ensure_initial_snapshot(connection)
-                row = connection.execute(
-                    "SELECT version, database_json, updated_at FROM app_state WHERE id = 1"
-                ).fetchone()
+        with self._connect() as connection:
+            self._ensure_initial_snapshot(connection)
+            row = connection.execute(
+                "SELECT version, database_json, updated_at FROM app_state WHERE id = 1"
+            ).fetchone()
         if row is None:
             return None
         database = json.loads(row["database_json"])
@@ -105,7 +107,7 @@ class SharedDatabaseStore:
         serialized_database = json.dumps(initial_database, ensure_ascii=False)
         updated_at = datetime.now(timezone.utc).isoformat()
 
-        with self._lock:
+        with self._write_lock:
             with self._connect() as connection:
                 connection.execute("DELETE FROM app_state")
                 connection.execute(
@@ -119,6 +121,7 @@ class SharedDatabaseStore:
                 self._last_timestamped_backup_at = None
                 self._write_latest_backup(connection)
                 self._write_timestamped_backup_if_needed(connection, 1)
+                self._record_version(1, initial_database)
 
         return {
             "database": initial_database,
@@ -130,7 +133,7 @@ class SharedDatabaseStore:
         serialized_database = json.dumps(database, ensure_ascii=False)
         updated_at = datetime.now(timezone.utc).isoformat()
 
-        with self._lock:
+        with self._write_lock:
             with self._connect() as connection:
                 row = connection.execute("SELECT version FROM app_state WHERE id = 1").fetchone()
 
@@ -162,8 +165,8 @@ class SharedDatabaseStore:
                 connection.commit()
                 self._write_latest_backup(connection)
                 self._write_timestamped_backup_if_needed(connection, next_version)
+                self._record_version(next_version, database)
 
-        self._record_version(next_version, database)
         return {
             "database": database,
             "version": next_version,
@@ -177,8 +180,10 @@ class SharedDatabaseStore:
             self._version_history.pop(0)
 
     def load_diff(self, from_version: int) -> dict[str, Any]:
+        with self._write_lock:
+            history = list(self._version_history)
         old_database = None
-        for v, db in self._version_history:
+        for v, db in history:
             if v == from_version:
                 old_database = db
                 break
@@ -225,14 +230,10 @@ class SharedDatabaseStore:
             source_connection.backup(backup_connection)
 
     def _ensure_initial_snapshot(self, connection: sqlite3.Connection) -> None:
-        row = connection.execute("SELECT 1 FROM app_state WHERE id = 1").fetchone()
-        if row is not None:
-            return
-
         initial_database = build_initial_database()
         connection.execute(
             """
-            INSERT INTO app_state (id, version, database_json, updated_at)
+            INSERT OR IGNORE INTO app_state (id, version, database_json, updated_at)
             VALUES (1, 1, ?, ?)
             """,
             (

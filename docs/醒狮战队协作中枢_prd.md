@@ -1544,8 +1544,8 @@ web_build/
 ├── menu.sh                 # 根目录指令菜单脚本
 ├── start_server.ps1        # Windows 启动脚本
 ├── start_server.sh         # Linux/Termux 启动脚本
-├── sync.sh                 # 代码同步脚本（保留数据库）
-├── backup_db.sh            # 数据库备份脚本
+├── sync.sh                 # 代码同步脚本（拉代码后回传整个 data 目录）
+├── backup_db.sh            # data 目录备份脚本
 └── scripts/commands/       # 指令动作脚本目录
 ```
 
@@ -1558,7 +1558,7 @@ web_build/
 #### Windows 部署
 
 ```powershell
-.\start_server.ps1
+.\start_server.ps1 start
 ```
 
 #### Termux Ubuntu 部署
@@ -1578,8 +1578,8 @@ chmod +x start_server.sh
 ./start_server.sh stop     # 停止
 ./start_server.sh status   # 查看状态
 ./start_server.sh logs     # 查看日志
-./sync.sh                  # 从 GitHub 同步代码（保留数据库）
-./backup_db.sh             # 备份数据库到 GitHub
+./sync.sh                  # 从 GitHub 同步代码，并在完成后回传整个 data 目录
+./backup_db.sh             # 备份整个 data 目录到 GitHub
 bash menu.sh              # 交互式指令菜单
 ```
 

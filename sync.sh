@@ -45,6 +45,22 @@ file_sha256() {
   sha256sum "$1" | awk '{print $1}'
 }
 
+upload_live_data_to_git() {
+  echo "[*] Uploading local /data directory to GitHub..."
+  git add data/
+
+  local timestamp
+  timestamp="$(date "+%Y-%m-%d %H:%M:%S")"
+  if git diff --cached --quiet; then
+    echo "[i] /data directory has no new changes to commit"
+  else
+    git commit -m "Sync data directory: $timestamp"
+  fi
+
+  git push origin master
+  echo "[✓] Local /data directory pushed to GitHub"
+}
+
 ensure_frontend_build_deps() {
   if ! command -v node >/dev/null 2>&1; then
     echo "[✗] Node.js is not installed."
@@ -165,6 +181,7 @@ stop_server_if_running
 backup_live_data
 ROLLBACK_REQUIRED=1
 deploy_release_tree
+upload_live_data_to_git
 
 echo "[*] Starting server..."
 chmod +x start_server.sh sync.sh
@@ -172,5 +189,5 @@ chmod +x start_server.sh sync.sh
 ROLLBACK_REQUIRED=0
 
 echo ""
-echo "[✓] Sync complete! Server restarted."
+echo "[✓] Sync complete! Code updated and /data uploaded."
 echo "    Access: http://127.0.0.1:4173"

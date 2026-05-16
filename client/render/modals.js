@@ -3,7 +3,7 @@ import { escapeHtml, escapeAttribute } from "../core/security.js";
 import { formatDateTime, toDateTimeLocalValue, addDays } from "../core/format.js";
 import { loadDraft, getDraftKey } from "../core/drafts.js";
 import { getCurrentUser, getCurrentMember, getMemberById, getTaskById, getApprovalById, getTaskParticipantRecords, getActiveParticipantCount, getMemberPointSummary, getMemberLoads, getMemberTimeline, getTaskParticipantRecordsByMember, getJoinActionLabel, getLifecycleActionDefinition } from "../domain/query.js";
-import { getLatestSubmissionSummary, getSubmissionAttachments } from "../domain/task.js";
+import { getLatestSubmissionSummary, getSubmissionAttachments, getTaskSettlementPreview } from "../domain/task.js";
 import { canReview, canDeleteAllGeneratedData, canEditTask, canDeleteTask, canDeleteApprovalRecord, canInteractWithTasks, canMemberBeAddedToTask, isRetiredMember, isDisabledMember, getLifecycleBlockingTasks, canRequestRoleChange, isAdmin } from "../domain/permissions.js";
 import { renderEmpty, renderTimelineCard, renderTaskCard, renderAttachmentCard, renderStatusBadge, renderPointPill, renderMemberDetail, renderSelectOptions, renderMultiSelectOptions, renderFilterField, renderFilterSelect } from "./components.js";
 import { renderTaskDetail, renderCompensationPanel, renderRatioPanel } from "./task-detail.js";
@@ -501,6 +501,7 @@ export function renderApprovalActionModal() {
   const task = isCompletionApproval ? getTaskById(approval.targetId) : null;
   const submissionSummary = task ? getLatestSubmissionSummary(task) : "";
   const submissionAttachments = task ? getSubmissionAttachments(task) : [];
+  const settlementPreview = task ? getTaskSettlementPreview(task) : null;
   return `
     <div class="modal">
       <div class="modal-card glass-card">
@@ -524,6 +525,7 @@ export function renderApprovalActionModal() {
             <div class="section-header"><div><h3>提交附件</h3><p>如果成员在提交审核时上传了附件，会在这里展示。</p></div></div>
             <div class="comment-list">${submissionAttachments.length ? submissionAttachments.map((attachment) => renderAttachmentCard(attachment)).join("") : renderEmpty("当前没有提交附件。")}</div>
           </section>
+          ${renderSettlementPreviewPanel(task, settlementPreview)}
         ` : approval.comment ? `<section class="panel"><div class="comment-card"><p>${escapeHtml(approval.comment)}</p></div></section>` : ""}
         <div class="button-row">
           ${isApprovable && approveAction ? `<button class="button-primary" type="button" data-action="${approveAction}" data-approval-id="${approval.id}">通过</button>` : ""}
@@ -532,6 +534,68 @@ export function renderApprovalActionModal() {
           <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
         </div>
       </div>
+    </div>
+  `;
+}
+
+function renderSettlementPreviewPanel(task, settlementPreview) {
+  if (!task || !settlementPreview) {
+    return "";
+  }
+
+  const participantCards = settlementPreview.memberSettlements
+    .map((entry) => renderSettlementPreviewCard(entry))
+    .join("");
+
+  return `
+    <section class="panel">
+      <div class="section-header">
+        <div>
+          <h3>积分分配预览</h3>
+          <p>审核通过后会立即按当前比例结算。这里展示的预估值与实际入账使用同一套规则。</p>
+        </div>
+      </div>
+      <div class="task-points">
+        ${renderPointPill("总研习点", settlementPreview.totals.study)}
+        ${renderPointPill("总工时点", settlementPreview.totals.labor)}
+        ${renderPointPill("总管理点", settlementPreview.totals.management)}
+        ${renderPointPill("总计", settlementPreview.totals.total)}
+      </div>
+      <div class="helper-text" style="margin-top:12px">
+        ${escapeHtml(`中途加入折扣 ${settlementPreview.middleJoinDiscount}x`)}
+        ${settlementPreview.wasOverdue ? ` · ${escapeHtml(`逾期折扣 ${settlementPreview.overdueDiscount}x`)}` : ""}
+      </div>
+      <div class="comment-list" style="margin-top:16px">
+        ${participantCards || renderEmpty("当前没有可结算的参与成员。")}
+      </div>
+    </section>
+  `;
+}
+
+function renderSettlementPreviewCard(entry) {
+  const memberName = entry.member?.name || "未知成员";
+  const roleLabel = entry.participant?.role || (entry.managementAmount > 0 ? "负责人" : "参与成员");
+  const joinTypeLabel = entry.participant
+    ? (entry.joinType === "middle" ? "中途加入" : "初始参与")
+    : "负责人结算";
+  const statusText = entry.eligible ? "正常参与结算" : "当前状态不参与积分累计";
+
+  return `
+    <div class="comment-card">
+      <div class="section-header" style="margin-bottom:8px">
+        <div>
+          <strong>${escapeHtml(memberName)}</strong>
+          <div class="helper-text">${escapeHtml(roleLabel)} · ${escapeHtml(joinTypeLabel)} · ${escapeHtml(statusText)}</div>
+        </div>
+        ${entry.participant ? `<span class="point-pill">权重 ${escapeHtml(String(entry.adjustedWeight))}</span>` : ""}
+      </div>
+      <div class="task-points">
+        ${renderPointPill("研习点", entry.studyAmount)}
+        ${renderPointPill("工时点", entry.laborAmount)}
+        ${renderPointPill("管理点", entry.managementAmount)}
+        ${renderPointPill("合计", entry.totalAmount)}
+      </div>
+      ${entry.participant ? `<div class="helper-text">贡献比例 ${escapeHtml(String(entry.participant.contributionRatio))}</div>` : ""}
     </div>
   `;
 }
