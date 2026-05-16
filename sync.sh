@@ -13,6 +13,7 @@ FRONTEND_HASH_FILE="$SCRIPT_DIR/node_modules/.package-lock.sha256"
 ROLLBACK_REQUIRED=0
 SERVER_WAS_RUNNING=0
 TARGET_NODE_MODULES_UPDATED=0
+DATA_UPLOAD_FAILED=0
 
 echo "[*] Syncing Lion Hub from GitHub..."
 
@@ -52,11 +53,11 @@ upload_live_data_to_git() {
   local timestamp
   timestamp="$(date "+%Y-%m-%d %H:%M:%S")"
   if git diff --cached --quiet; then
-    echo "[i] /data directory has no new changes to commit"
-  else
-    git commit -m "Sync data directory: $timestamp"
+    echo "[i] /data directory has no new changes to upload"
+    return 0
   fi
 
+  git commit -m "Sync data directory: $timestamp"
   git push origin master
   echo "[✓] Local /data directory pushed to GitHub"
 }
@@ -181,13 +182,23 @@ stop_server_if_running
 backup_live_data
 ROLLBACK_REQUIRED=1
 deploy_release_tree
-upload_live_data_to_git
+ROLLBACK_REQUIRED=0
+
+if ! upload_live_data_to_git; then
+  DATA_UPLOAD_FAILED=1
+  echo "[!] Code sync succeeded, but uploading /data to GitHub failed."
+  echo "    Local /data changes are still preserved in the current repository."
+  echo "    Please fix Git authentication/network and run the /data upload command again."
+fi
 
 echo "[*] Starting server..."
 chmod +x start_server.sh sync.sh
 ./start_server.sh start
-ROLLBACK_REQUIRED=0
 
 echo ""
-echo "[✓] Sync complete! Code updated and /data uploaded."
+if [ "$DATA_UPLOAD_FAILED" -eq 1 ]; then
+  echo "[!] Sync complete with warning: code updated, but /data was not pushed to GitHub."
+else
+  echo "[✓] Sync complete! Code updated and /data uploaded."
+fi
 echo "    Access: http://127.0.0.1:4173"
