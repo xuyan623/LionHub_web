@@ -202,6 +202,8 @@ const persisted = loadPersistentState();
 
 export const state = {
   database: null,
+  databaseReady: false,
+  databaseHydrating: false,
   databaseVersion: 0,
   currentUserId: null,
   route: "dashboard",

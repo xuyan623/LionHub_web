@@ -1,29 +1,18 @@
-const CACHE_VERSION = "v1";
-const STATIC_CACHE = `static-${CACHE_VERSION}`;
-const API_CACHE = `api-${CACHE_VERSION}`;
+const CACHE_VERSION = "__BUILD_VERSION__";
+const SHELL_CACHE = `shell-${CACHE_VERSION}`;
+const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
-const STATIC_ASSETS = [
-  "/index.html",
-  "/app.js",
-  "/css/base.css",
-  "/css/layout.css",
-  "/css/components.css",
-  "/css/responsive.css",
-];
+const STATIC_ASSETS = __STATIC_ASSETS__;
 
-const API_ROUTES = ["/api/database", "/api/health", "/api/uploads"];
-
-// Install: pre-cache static shell
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
-      .open(STATIC_CACHE)
+      .open(SHELL_CACHE)
       .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
 
-// Activate: clean stale caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -31,7 +20,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key !== STATIC_CACHE && key !== API_CACHE)
+            .filter((key) => key !== SHELL_CACHE && key !== RUNTIME_CACHE)
             .map((key) => caches.delete(key))
         )
       )
@@ -39,14 +28,14 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-/**
- * Determine caching strategy based on request URL.
- */
 function getStrategy(request) {
-  const url = new URL(request.url);
-  const pathname = url.pathname;
+  const pathname = new URL(request.url).pathname;
 
-  if (pathname === "/index.html" || STATIC_ASSETS.includes(pathname)) {
+  if (pathname === "/" || pathname === "/index.html") {
+    return "network-first";
+  }
+
+  if (pathname.startsWith("/assets/")) {
     return "cache-first";
   }
 
@@ -62,32 +51,28 @@ function getStrategy(request) {
     return "network-first";
   }
 
-  if (pathname.startsWith("/client/")) {
-    return "cache-first";
-  }
-
   return "network-only";
 }
 
-async function cacheFirst(request) {
+async function cacheFirst(request, cacheName = RUNTIME_CACHE) {
   const cached = await caches.match(request);
   if (cached) return cached;
   const response = await fetch(request);
   if (response && response.status === 200) {
-    const cache = await caches.open(STATIC_CACHE);
+    const cache = await caches.open(cacheName);
     cache.put(request, response.clone());
   }
   return response;
 }
 
-async function networkFirst(request) {
+async function networkFirst(request, cacheName = RUNTIME_CACHE) {
   try {
-    const networkResponse = await fetch(request);
-    if (networkResponse && networkResponse.status === 200) {
-      const cache = await caches.open(API_CACHE);
-      cache.put(request, networkResponse.clone());
+    const response = await fetch(request);
+    if (response && response.status === 200) {
+      const cache = await caches.open(cacheName);
+      cache.put(request, response.clone());
     }
-    return networkResponse;
+    return response;
   } catch (error) {
     const cached = await caches.match(request);
     if (cached) return cached;
@@ -95,11 +80,9 @@ async function networkFirst(request) {
   }
 }
 
-// Fetch: route to appropriate strategy
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Skip non-GET requests and non-http(s) schemes
   if (request.method !== "GET") return;
   if (!request.url.startsWith("http")) return;
 
@@ -107,13 +90,14 @@ self.addEventListener("fetch", (event) => {
 
   if (strategy === "cache-first") {
     event.respondWith(cacheFirst(request));
-  } else if (strategy === "network-first") {
+    return;
+  }
+
+  if (strategy === "network-first") {
     event.respondWith(networkFirst(request));
   }
-  // "network-only" falls through to default browser behavior
 });
 
-// Message handling: allow app to trigger update checks
 self.addEventListener("message", (event) => {
   if (event.data === "skipWaiting") {
     self.skipWaiting();

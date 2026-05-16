@@ -1,0 +1,11 @@
+{
+  "name": "lion-hub-web",
+  "private": true,
+  "scripts": {
+    "build:web": "node ./scripts/build-web.mjs",
+    "check:web": "node ./scripts/build-web.mjs --check"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.5"
+  }
+}

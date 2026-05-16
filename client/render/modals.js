@@ -34,7 +34,7 @@ export function renderModal() {
   }
 }
 
-function renderMemberDetailModal() {
+export function renderMemberDetailModal() {
   const member = getMemberById(state.modal.memberId);
   if (!member) return "";
   return `
@@ -50,7 +50,7 @@ function renderMemberDetailModal() {
   `;
 }
 
-function renderSensitiveActionModal() {
+export function renderSensitiveActionModal() {
   const actionDefinition = getLifecycleActionDefinition(state.modal.actionKey, state.modal.memberId);
   const currentUser = getCurrentUser();
   if (!actionDefinition || !currentUser) return "";
@@ -88,7 +88,7 @@ function renderSensitiveActionModal() {
   `;
 }
 
-function renderRegistrationEditModal() {
+export function renderRegistrationEditModal() {
   const user = getCurrentUser();
   const member = user ? getMemberById(user.memberId) : null;
   if (!user || user.status === "active" || !member) return "";
@@ -124,7 +124,7 @@ function renderRegistrationEditModal() {
    `;
  }
 
-function renderProfileContentModal() {
+export function renderProfileContentModal() {
   const member = getCurrentMember();
   if (!member) return "";
   return `
@@ -147,7 +147,7 @@ function renderProfileContentModal() {
   `;
 }
 
-function renderRoleChangeRequestModal() {
+export function renderRoleChangeRequestModal() {
   const member = getCurrentMember();
   if (!member) return "";
   const currentIdentityLabel = dictionaries.identities[member.identity];
@@ -172,7 +172,7 @@ function renderRoleChangeRequestModal() {
   `;
 }
 
-function renderPromotionDetailModal() {
+export function renderPromotionDetailModal() {
   const approval = getApprovalById(state.modal.approvalId);
   const member = approval ? getMemberById(approval.targetId) : null;
   if (!approval || !member) return "";
@@ -205,7 +205,7 @@ function renderPromotionDetailModal() {
   `;
 }
 
-function renderTaskCompletionModal() {
+export function renderTaskCompletionModal() {
   const task = getTaskById(state.modal.taskId);
   if (!task) return "";
   const latestSubmissionSummary = getLatestSubmissionSummary(task);
@@ -235,7 +235,7 @@ function renderTaskCompletionModal() {
   `;
 }
 
-function renderTaskDetailModal() {
+export function renderTaskDetailModal() {
   const task = getTaskById(state.modal.taskId);
   if (!task) return "";
   return `
@@ -255,7 +255,7 @@ function renderTaskDetailModal() {
   `;
 }
 
-function renderShareTaskModal() {
+export function renderShareTaskModal() {
   const task = getTaskById(state.modal.taskId);
   if (!task) return "";
   const owner = getMemberById(task.ownerId);
@@ -300,7 +300,7 @@ function renderShareTaskModal() {
   `;
 }
 
-function renderTaskFormModal() {
+export function renderTaskFormModal() {
   const taskId = state.modal.taskId || state.modal.cloneFromTaskId;
   const task = taskId ? getTaskById(taskId) : null;
   const editing = Boolean(state.modal.taskId);
@@ -439,7 +439,7 @@ function renderTaskEditParticipantRow(task, participant) {
   `;
 }
 
-function renderMemberFormModal() {
+export function renderMemberFormModal() {
   const member = getMemberById(state.modal.memberId);
   if (!member) return "";
   const lifecycleExplanation = !member.hiddenFromDirectory && member.memberStatus === "normal" ? getLifecycleActionDefinition("force-retire-member", member.id)?.description || "" : "";
@@ -490,7 +490,7 @@ function renderMemberFormModal() {
   `;
 }
 
-function renderApprovalActionModal() {
+export function renderApprovalActionModal() {
   const approval = getApprovalById(state.modal.approvalId);
   if (!approval) return "";
   const target = resolveApprovalTarget(approval);
@@ -535,7 +535,7 @@ function resolveApprovalTarget(approval) {
   return { title: "未知记录", subtitle: approval.comment || "" };
 }
 
-function renderRegistrationReviewModal() {
+export function renderRegistrationReviewModal() {
   const approval = getApprovalById(state.modal.approvalId);
   const pendingMember = approval ? getMemberById(approval.targetId) : null;
   if (!approval || !pendingMember) return "";
@@ -575,7 +575,7 @@ function renderRegistrationReviewModal() {
   `;
 }
 
-function renderFileManagerModal() {
+export function renderFileManagerModal() {
   const files = state.settingsFiles;
   const fileIndex = state.attachmentsIndex || {};
   return `
@@ -643,7 +643,7 @@ function renderFileManagerModal() {
   `;
 }
 
-function renderTaskOwnerReassignModal() {
+export function renderTaskOwnerReassignModal() {
   const task = getTaskById(state.modal.taskId);
   if (!task) return "";
   const candidateParticipants = getTaskOwnerReassignCandidates(task);
@@ -672,7 +672,7 @@ function renderTaskOwnerReassignModal() {
   `;
 }
 
-function renderPasswordChangeModal() {
+export function renderPasswordChangeModal() {
   return `
     <div class="modal">
       <div class="modal-card glass-card">
@@ -694,7 +694,7 @@ function renderPasswordChangeModal() {
   `;
 }
 
-function renderRetireFormModal() {
+export function renderRetireFormModal() {
   const member = getCurrentMember();
   if (!member) return "";
   return `
@@ -723,7 +723,7 @@ function renderRetireFormModal() {
   `;
 }
 
-function renderProgressNoteFormModal() {
+export function renderProgressNoteFormModal() {
   const task = getTaskById(state.modal.taskId);
   if (!task) return "";
   return `
@@ -746,7 +746,7 @@ function renderProgressNoteFormModal() {
   `;
 }
 
-function renderTaskAttachmentFormModal() {
+export function renderTaskAttachmentFormModal() {
   const task = getTaskById(state.modal.taskId);
   if (!task) return "";
   return `

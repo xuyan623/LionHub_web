@@ -8,6 +8,37 @@ BACKUP_DIR="/tmp/lion_hub_data_backup"
 
 echo "[*] Syncing Lion Hub from GitHub..."
 
+ensure_frontend_build_deps() {
+  if ! command -v node >/dev/null 2>&1; then
+    echo "[✗] Node.js is not installed."
+    echo "    Please install nodejs before running sync.sh."
+    echo "    Example: sudo apt update && sudo apt install -y nodejs npm"
+    exit 1
+  fi
+
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "[✗] npm is not installed."
+    echo "    Please install npm before running sync.sh."
+    echo "    Example: sudo apt update && sudo apt install -y nodejs npm"
+    exit 1
+  fi
+}
+
+build_frontend() {
+  ensure_frontend_build_deps
+
+  echo "[*] Installing frontend dependencies..."
+  if [ -f "package-lock.json" ]; then
+    npm ci --no-audit --no-fund
+  else
+    npm install --no-audit --no-fund
+  fi
+
+  echo "[*] Building frontend assets..."
+  npm run build:web
+  echo "[✓] Frontend assets rebuilt"
+}
+
 # 1. Stop server if running
 if [ -f ".server.pid" ] && kill -0 "$(cat ".server.pid")" 2>/dev/null; then
   echo "[*] Stopping server..."
@@ -39,7 +70,10 @@ if [ -d "$BACKUP_DIR" ]; then
   echo "[✓] Data directory restored"
 fi
 
-# 5. Restart server in background
+# 5. Rebuild frontend for the pulled source tree
+build_frontend
+
+# 6. Restart server in background
 echo "[*] Starting server..."
 chmod +x start_server.sh sync.sh
 ./start_server.sh start

@@ -1,23 +1,15 @@
-import { state, appRoot } from "../core/state.js";
-import { escapeHtml, escapeAttribute } from "../core/security.js";
-import { formatDateTime } from "../core/format.js";
-import { getInitials } from "../core/utils.js";
-import { ensureVisibleRoute } from "../domain/permissions.js";
-import { getCurrentUser, getCurrentMember, getSearchPlaceholder } from "../domain/query.js";
-import { saveSession } from "../core/database.js";
-import { setServices, pushFlash } from "../core/services.js";
-import { canCreateTask, getVisibleRoutes, isAdmin } from "../domain/permissions.js";
-import { dictionaries, options } from "../core/state.js";
-import { renderDashboardPage, renderMarketPage, renderMyTasksPage, renderTaskManagementPage, renderMembersPage, renderProjectsPage, renderRankingsPage, renderReviewsPage, renderProfilePage, renderSettingsPage } from "./pages.js";
-import { renderModal } from "./modals.js";
-import { getPendingApprovalCount } from "./components.js";
+import { appRoot, dictionaries, options, routes, state } from "../core/state.js";
+import { escapeAttribute, escapeHtml } from "../core/security.js";
+import { loadRouteChunk, loadWorkspaceRuntime, getLoadedWorkspaceRuntime } from "../core/runtime-loader.js";
+import { saveSession } from "../core/session.js";
+import { setServices } from "../core/services.js";
 
 function dismissFlashDom() {
   state.flash = "";
-  const el = document.querySelector('.flash-toast');
-  if (el) {
-    el.classList.remove('is-visible');
-    el.style.display = 'none';
+  const element = document.querySelector(".flash-toast");
+  if (element) {
+    element.classList.remove("is-visible");
+    element.style.display = "none";
   }
   state.flashTimer = null;
 }
@@ -29,133 +21,85 @@ function pushFlashImpl(message, tone = "info") {
   state.flash = message;
   state.flashTone = tone;
 
-  let el = document.querySelector('.flash-toast');
-  if (!el) {
-    // Fallback if workspace hasn't rendered yet
+  let element = document.querySelector(".flash-toast");
+  if (!element) {
     renderAppImpl();
-    el = document.querySelector('.flash-toast');
+    element = document.querySelector(".flash-toast");
   }
-  if (el) {
-    el.style.display = '';
-    el.className = `flash-toast flash-${tone} is-visible`;
-    const textEl = el.querySelector('.flash-text');
-    if (textEl) textEl.textContent = message;
+  if (element) {
+    element.style.display = "";
+    element.className = `flash-toast flash-${tone} is-visible`;
+    const textElement = element.querySelector(".flash-text");
+    if (textElement) {
+      textElement.textContent = message;
+    }
   }
 
   state.flashTimer = setTimeout(() => dismissFlashDom(), 5000);
 }
 
-let _lastRoute = "";
-let _lastUserId = "";
-
-function _computeModalKey() {
-  if (!state.modal) return "";
-  return `${state.modal.type}:${state.modal.taskId || state.modal.memberId || state.modal.approvalId || ""}`;
-}
-
-function _updateShellWidgets() {
-  if (state.flash) {
-    const el = document.querySelector('.flash-toast');
-    if (el) {
-      el.style.display = '';
-      el.className = `flash-toast flash-${state.flashTone} is-visible`;
-      const textEl = el.querySelector('.flash-text');
-      if (textEl) textEl.textContent = state.flash;
-    }
-  } else {
-    const el = document.querySelector('.flash-toast');
-    if (el) {
-      el.classList.remove('is-visible');
-      el.style.display = 'none';
-    }
-  }
-  const workspace = document.querySelector('.workspace');
-  if (workspace) {
-    const existingBar = workspace.querySelector('.form-loading-bar');
-    if (state.formLoading || state.loadingRoute) {
-      if (!existingBar) {
-        const flashEl = workspace.querySelector('.flash-toast');
-        if (flashEl) flashEl.insertAdjacentHTML('afterend', '<div class="form-loading-bar"></div>');
-      }
-    } else if (existingBar) {
-      existingBar.remove();
-    }
-  }
-  const sidebar = document.querySelector('.sidebar');
-  if (sidebar) {
-    sidebar.classList.toggle('is-open', state.mobileNavOpen);
-  }
-  const backdrop = document.querySelector('.backdrop');
-  if (backdrop) {
-    backdrop.classList.toggle('is-open', state.mobileNavOpen || Boolean(state.modal));
-  }
-}
-
-function _updateModalLayer() {
-  const existingModal = document.querySelector('.modal');
-  const modalHtml = state.modal ? renderModal() : "";
-  if (existingModal) {
-    if (modalHtml) existingModal.outerHTML = modalHtml;
-    else existingModal.remove();
-  } else if (modalHtml) {
-    const workspace = document.querySelector('.workspace');
-    if (workspace) workspace.insertAdjacentHTML('beforeend', modalHtml);
-  }
+export function renderApp() {
+  renderAppImpl();
 }
 
 function renderAppImpl() {
   try {
-    if (state.modal && !document.querySelector(".modal")) {
-      state.modalScrollY = window.scrollY;
-    }
     if (state.initError) {
       appRoot.innerHTML = renderInitializationErrorShell();
-      _lastRoute = "";
       return;
     }
-    ensureVisibleRoute();
+
     if (!state.currentUserId) {
       appRoot.innerHTML = renderAuthShell();
-      _lastRoute = "";
       return;
     }
-    const user = getCurrentUser();
+
+    if (!state.databaseReady) {
+      void loadWorkspaceRuntime();
+      void loadRouteChunk(state.route);
+      appRoot.innerHTML = renderWorkspaceLoadingShell();
+      return;
+    }
+
+    const user = getCurrentUserRecord();
     if (!user) {
       state.currentUserId = null;
-      saveSession();
+      saveSession(state.currentUserId);
       appRoot.innerHTML = renderAuthShell();
-      _lastRoute = "";
       return;
     }
+
     if (user.status !== "active") {
-      appRoot.innerHTML = renderWaitingShell(user) + (state.modal ? renderModal() : "");
-      _lastRoute = "";
+      appRoot.innerHTML = renderWaitingShell(user);
       return;
     }
 
-    const workspace = document.querySelector('.workspace');
-    const shouldFullRender = !workspace || _lastRoute !== state.route || _lastUserId !== state.currentUserId;
-
-    if (shouldFullRender) {
-      appRoot.innerHTML = renderWorkspace();
-      _lastRoute = state.route;
-      _lastUserId = state.currentUserId;
-    } else {
-      const pageContent = document.querySelector('.page-content');
-      if (pageContent) {
-        pageContent.innerHTML = renderCurrentPage();
-      }
-      _updateModalLayer();
-      _updateShellWidgets();
+    const runtime = getLoadedWorkspaceRuntime();
+    if (!runtime) {
+      void loadWorkspaceRuntime();
+      void loadRouteChunk(state.route);
+      appRoot.innerHTML = renderWorkspaceLoadingShell(getMemberRecord(user.memberId));
+      return;
     }
+
+    runtime.renderWorkspaceRoot(appRoot);
   } catch (error) {
-    appRoot.innerHTML = `<div style="padding:40px;color:#ff6666"><h2>渲染错误</h2><pre style="white-space:pre-wrap">${escapeHtml(error.stack || error.message || String(error))}</pre></div>`;
+    appRoot.innerHTML = `
+      <div style="padding:40px;color:#ff6666">
+        <h2>渲染错误</h2>
+        <pre style="white-space:pre-wrap">${escapeHtml(error.stack || error.message || String(error))}</pre>
+      </div>
+    `;
     console.error("renderApp error:", error);
   }
 }
 
-export function renderApp() {
-  renderAppImpl();
+function getCurrentUserRecord() {
+  return state.database?.users.find((user) => user.id === state.currentUserId) || null;
+}
+
+function getMemberRecord(memberId) {
+  return state.database?.members.find((member) => member.id === memberId) || null;
 }
 
 function renderInitializationErrorShell() {
@@ -168,7 +112,7 @@ function renderInitializationErrorShell() {
         <div class="auth-card glass-card">
           <div class="boot-mark">Lion Hub</div>
           <h1>应用启动失败</h1>
-          <p>初始化成员、任务与登录数据时发生错误，页面已停止在安全错误态，而不是继续卡在装载页。</p>
+          <p>初始化成员、任务与登录数据时发生错误，页面已停止在安全错误态。</p>
           <div class="panel">
             <div class="definition-list">
               <div class="definition-row"><span>错误信息</span><strong>${escapeHtml(state.initError)}</strong></div>
@@ -182,7 +126,7 @@ function renderInitializationErrorShell() {
         <div class="hero-panel glass-card">
           <div class="brand-badge">Startup Diagnostics</div>
           <h2>如果你是通过网穿地址在手机上打开，这里最常见的问题是使用了 HTTP 而不是 HTTPS。</h2>
-          <p>当前版本已经为密码哈希增加了非 Web Crypto 回退实现。若仍失败，请强制刷新页面，或清掉浏览器站点缓存后重试。</p>
+          <p>若仍失败，请强制刷新页面，或清掉浏览器站点缓存后重试。</p>
         </div>
       </aside>
     </div>
@@ -190,6 +134,9 @@ function renderInitializationErrorShell() {
 }
 
 function renderAuthShell() {
+  const hydrationMessage = state.databaseHydrating
+    ? "正在连接共享服务。你可以先填写表单，提交时会自动等待数据同步完成。"
+    : "共享服务已就绪。";
   return `
     <div class="auth-layout">
       <section class="auth-panel">
@@ -202,6 +149,7 @@ function renderAuthShell() {
           <h1>${state.authMode === "login" ? "进入战队协作中枢" : "提交注册进入审核流"}</h1>
           <p>${state.authMode === "login" ? "支持邮箱 + 密码登录。待审核账号登录后会进入审核中页面。" : "注册后自动进入待审核状态，由管理员分配身份、部门与系统权限。"}</p>
           ${state.authMode === "login" ? renderLoginForm() : renderRegisterForm()}
+          <div class="helper-text" style="margin-top:12px">${escapeHtml(hydrationMessage)}</div>
           <div class="feedback ${state.authFeedback ? "error" : ""}">${escapeHtml(state.authFeedback || "")}</div>
         </div>
       </section>
@@ -223,15 +171,15 @@ function renderAuthShell() {
 }
 
 function renderLoginForm() {
-   return `
-     <form class="auth-form" data-form="login">
-       <label class="field-group"><span class="field-label">邮箱</span><input class="field-input" type="email" name="email" placeholder="name@example.com" required></label>
-       <label class="field-group"><span class="field-label">密码</span><input class="field-input" type="password" name="password" placeholder="请输入密码" required></label>
-       <label class="field-group" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="rememberMe" checked ${state.rememberMe ? "checked" : ""} style="width:18px;height:18px;accent-color:white"> <span class="helper-text">记住登录状态</span></label>
-       <div class="button-row"><button class="button-primary" type="submit" ${state.formLoading === 'login' ? 'disabled' : ''}>登录</button><button class="button-ghost" type="button" data-action="switch-auth" data-mode="register">注册新账号</button></div>
-     </form>
-   `;
- }
+  return `
+    <form class="auth-form" data-form="login">
+      <label class="field-group"><span class="field-label">邮箱</span><input class="field-input" type="email" name="email" placeholder="name@example.com" required></label>
+      <label class="field-group"><span class="field-label">密码</span><input class="field-input" type="password" name="password" placeholder="请输入密码" required></label>
+      <label class="field-group" style="flex-direction:row;align-items:center;gap:8px"><input type="checkbox" name="rememberMe" checked ${state.rememberMe ? "checked" : ""} style="width:18px;height:18px;accent-color:white"> <span class="helper-text">记住登录状态</span></label>
+      <div class="button-row"><button class="button-primary" type="submit" ${state.formLoading === "login" ? "disabled" : ""}>登录</button><button class="button-ghost" type="button" data-action="switch-auth" data-mode="register">注册新账号</button></div>
+    </form>
+  `;
+}
 
 function renderRegisterForm() {
   return `
@@ -251,13 +199,13 @@ function renderRegisterForm() {
         <label class="field-group"><span class="field-label">技能标签</span><input class="field-input" type="text" name="skills" placeholder="用逗号分隔，例如 C, ROS, OpenCV"></label>
       </div>
       <label class="field-group"><span class="field-label">个人简介</span><textarea class="field-textarea" name="bio" placeholder="简单介绍擅长方向、参与经历或希望承担的工作"></textarea></label>
-      <div class="button-row"><button class="button-primary" type="submit" ${state.formLoading === 'register' ? 'disabled' : ''}>提交注册</button><button class="button-ghost" type="button" data-action="switch-auth" data-mode="login">返回登录</button></div>
+      <div class="button-row"><button class="button-primary" type="submit" ${state.formLoading === "register" ? "disabled" : ""}>提交注册</button><button class="button-ghost" type="button" data-action="switch-auth" data-mode="login">返回登录</button></div>
     </form>
   `;
 }
 
 function renderWaitingShell(user) {
-  const member = getMemberById(user.memberId);
+  const member = getMemberRecord(user.memberId);
   const isRejected = user.status === "rejected";
   const isDisabled = user.status === "disabled";
   return `
@@ -292,10 +240,12 @@ function renderWaitingShell(user) {
   `;
 }
 
-function renderWorkspace() {
-  const member = getCurrentMember();
-  const navItems = getVisibleRoutes();
-  const pendingCount = getPendingApprovalCount();
+function renderWorkspaceLoadingShell(member = null) {
+  const currentRoute = routes.find((route) => route.id === state.route);
+  const routeLabel = currentRoute ? currentRoute.label : "当前页面";
+  const routeButtons = routes
+    .map((route) => `<button type="button" class="nav-item ${route.id === state.route ? "is-active" : ""}" data-action="navigate" data-route="${route.id}"><span>${route.label}</span></button>`)
+    .join("");
   return `
     <div class="workspace">
       <aside class="sidebar ${state.mobileNavOpen ? "is-open" : ""}">
@@ -306,104 +256,50 @@ function renderWorkspace() {
         </div>
         <div class="nav-group">
           <div class="nav-label">Workspace</div>
-          ${navItems.map((route) => {
-            const suffix = route.id === "reviews" && pendingCount > 0 ? `<small>${pendingCount}</small>` : "";
-            return `<button type="button" class="nav-item ${state.route === route.id ? "is-active" : ""}" data-action="navigate" data-route="${route.id}"><span>${route.label}</span>${suffix}</button>`;
-          }).join("")}
+          ${routeButtons}
         </div>
         <div class="sidebar-footer">
-          <strong>${escapeHtml(member.name)}</strong>
-          <span>${escapeHtml(dictionaries.identities[member.identity])} · ${escapeHtml(dictionaries.roles[member.role])}</span>
-          <span class="helper-text">${escapeHtml(member.departments.join(" / "))}</span>
+          <strong>${escapeHtml(member?.name || "正在恢复会话")}</strong>
+          <span>${escapeHtml(member ? `${dictionaries.identities[member.identity]} · ${dictionaries.roles[member.role]}` : "同步成员资料中")}</span>
+          <span class="helper-text">${escapeHtml(member?.departments?.join(" / ") || "首次进入会先加载工作台数据")}</span>
           <div class="button-row">
             <button class="button-secondary" type="button" data-action="navigate" data-route="profile">个人中心</button>
             <button class="button-ghost" type="button" data-action="logout">退出</button>
           </div>
         </div>
       </aside>
-<div class="flash-toast ${state.flash ? 'is-visible' : ''}" style="display:${state.flash ? '' : 'none'}"><span class="flash-text">${escapeHtml(state.flash)}</span><button class="flash-close" type="button" data-action="dismiss-flash">×</button></div>
-       ${state.formLoading || state.loadingRoute ? `<div class="form-loading-bar"></div>` : ""}
-       <main class="main-area">
-         <div class="topbar">
+      <main class="main-area">
+        <div class="topbar">
           <div class="search-shell">
             <button class="button-ghost mobile-toggle" type="button" data-action="toggle-nav">菜单</button>
-            <input type="text" placeholder="${getSearchPlaceholder()}" value="${escapeAttribute(state.globalSearch)}" data-global-search>
+            <input type="text" placeholder="正在装载工作台数据…" value="" disabled>
           </div>
           <div class="topbar-actions">
-            <span class="topbar-chip">待审核 ${pendingCount}</span>
-            <div class="notif-bell" style="position:relative">
-              <button class="button-ghost" type="button" data-action="toggle-notif-panel" style="position:relative;padding:8px 12px;font-size:1.2rem">${renderNotifIcon()}</button>
-              ${state.notifPanelOpen ? renderNotifPanel() : ""}
-            </div>
-            ${canCreateTask() ? '<button class="button-primary" type="button" data-action="open-create-task">新建任务</button>' : ""}
-            <div class="profile-pill">
-              <div class="avatar">${escapeHtml(getInitials(member.name))}</div>
-              <div><strong>${escapeHtml(member.name)}</strong><div class="helper-text">${escapeHtml(dictionaries.roles[member.role])}</div></div>
-            </div>
+            <span class="topbar-chip">同步中</span>
           </div>
         </div>
-        <div class="page-content">${renderCurrentPage()}</div>
+        <div class="page-content">
+          <section>
+            <div class="page-header">
+              <div><h2>${escapeHtml(routeLabel)}</h2><p>正在同步首屏数据与页面资源，工作台壳层已先显示。</p></div>
+            </div>
+            <section class="panel">
+              <div class="empty-state">正在加载当前页面内容…</div>
+            </section>
+          </section>
+        </div>
       </main>
-      <div class="backdrop ${state.mobileNavOpen || state.modal ? "is-open" : ""}" data-action="close-overlay"></div>
-      ${state.modal ? renderModal() : ""}
+      <div class="backdrop ${state.mobileNavOpen ? "is-open" : ""}" data-action="close-overlay"></div>
     </div>
   `;
 }
 
-function renderCurrentPage() {
-  switch (state.route) {
-    case "dashboard": return renderDashboardPage();
-    case "market": return renderMarketPage();
-    case "myTasks": return renderMyTasksPage();
-    case "taskManagement": return renderTaskManagementPage();
-    case "members": return renderMembersPage();
-    case "projects": return renderProjectsPage();
-    case "rankings": return renderRankingsPage();
-    case "reviews": return renderReviewsPage();
-    case "profile": return renderProfilePage();
-    case "settings": return renderSettingsPage();
-    default: return renderDashboardPage();
-  }
+function renderSelectOptions(values, selectedValue = "", labels = null) {
+  return values.map((value) => {
+    const selected = value === selectedValue ? "selected" : "";
+    const label = labels ? labels[value] : value;
+    return `<option value="${escapeAttribute(value)}" ${selected}>${escapeHtml(label)}</option>`;
+  }).join("");
 }
 
 setServices({ pushFlash: pushFlashImpl, renderApp: renderAppImpl });
-
-export { pushFlash, renderNotifIcon, renderNotifPanel };
-
-function renderNotifIcon() {
-  const unread = getUnreadNotificationCount();
-  return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text-soft);vertical-align:middle"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>${unread ? `<span style="position:absolute;top:-2px;right:-4px;min-width:16px;height:16px;border-radius:8px;background:var(--text-soft);color:#111;font-size:0.65rem;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 4px">${unread > 99 ? "99+" : unread}</span>` : ""}`;
-}
-
-let _notifCache = { items: [], version: -1 };
-
-function computeNotifications() {
-  if (!state.database) return [];
-  if (state.databaseVersion === _notifCache.version) return _notifCache.items;
-  _notifCache.items = getNotificationsForCurrentUser();
-  _notifCache.version = state.databaseVersion;
-  return _notifCache.items;
-}
-
-function renderNotifPanel() {
-  const items = computeNotifications();
-  const unreadCount = items.filter((n) => !n.read).length;
-  return `
-    <div class="notif-panel" style="position:absolute;top:100%;right:0;width:320px;max-width:calc(100vw - 48px);max-height:400px;overflow-y:auto;z-index:30;margin-top:4px;border-radius:16px;border:1px solid var(--line);background:rgba(20,20,22,0.98);backdrop-filter:blur(16px);box-shadow:0 16px 48px rgba(0,0,0,0.5);padding:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)">
-        <strong style="font-size:0.95rem">我的通知${unreadCount ? ` (${unreadCount})` : ""}</strong>
-        <button class="button-ghost" type="button" data-action="toggle-notif-panel" style="padding:4px 8px;font-size:0.8rem">关闭</button>
-      </div>
-      ${items.length ? items.map((n) => `
-        <div style="padding:8px 6px;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.85rem;color:var(--text-soft);${n.read ? "opacity:0.5" : ""}">
-          <div>${escapeHtml(n.text)}</div>
-          <div style="font-size:0.75rem;color:var(--text-faint);margin-top:4px">${formatDateTime(n.createdAt)}</div>
-        </div>
-      `).join("") : '<div style="padding:20px;text-align:center;color:var(--text-faint);font-size:0.85rem">暂无近7天通知</div>'}
-    </div>
-  `;
-}
-
-import { getMemberById } from "../domain/query.js";
-import { renderSelectOptions } from "./components.js";
-import { getNotificationsForCurrentUser, getUnreadNotificationCount } from "../domain/notifications.js";

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import mimetypes
+import re
 import sqlite3
 import time
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from backend.config import (
     APP_DIR,
     BACKUPS_DIR,
     DB_PATH,
+    DIST_DIR,
     INDEX_PATH,
     UPLOADS_DIR,
 )
@@ -103,7 +105,9 @@ def _check_rate_limit(ip: str) -> bool:
 
 
 CACHE_CONTROL_NO_CACHE = "no-cache, no-store, must-revalidate"
-STATIC_CACHE_EXTENSIONS = {".css", ".js", ".html"}
+CACHE_CONTROL_IMMUTABLE = "public, max-age=31536000, immutable"
+CACHE_CONTROL_REVALIDATE = "public, max-age=0, must-revalidate"
+HASHED_ASSET_PATH = re.compile(r"^assets/.+-[A-Z0-9]{8,}\.[a-z0-9]+$")
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -123,11 +127,25 @@ def _get_client_ip(request: Request) -> str:
 
 def _make_static_response(file_path: Path) -> FileResponse:
     response = FileResponse(file_path)
-    if file_path.suffix.lower() in STATIC_CACHE_EXTENSIONS:
-        response.headers["Cache-Control"] = CACHE_CONTROL_NO_CACHE
+    response.headers["Cache-Control"] = _get_cache_control(file_path)
     for header, value in SECURITY_HEADERS.items():
         response.headers.setdefault(header, value)
     return response
+
+
+def _get_cache_control(file_path: Path) -> str:
+    try:
+        relative_path = file_path.resolve().relative_to(DIST_DIR.resolve()).as_posix()
+    except ValueError:
+        return CACHE_CONTROL_NO_CACHE
+
+    if relative_path in {"index.html", "sw.js", "manifest.json"}:
+        return CACHE_CONTROL_NO_CACHE
+
+    if HASHED_ASSET_PATH.match(relative_path):
+        return CACHE_CONTROL_IMMUTABLE
+
+    return CACHE_CONTROL_REVALIDATE
 
 
 def _load_api_key() -> str:
@@ -348,6 +366,8 @@ def serve_uploaded_file(requested_path: str, downloadName: str | None = None) ->
 
 @app.get("/", include_in_schema=False)
 def serve_index() -> FileResponse:
+    if not INDEX_PATH.is_file():
+        raise HTTPException(status_code=503, detail="前端静态产物缺失，请先运行 npm run build:web。")
     return _make_static_response(INDEX_PATH)
 
 
@@ -357,18 +377,18 @@ def serve_static_asset(requested_path: str) -> FileResponse:
         raise HTTPException(status_code=404, detail="Not found")
 
     if not requested_path:
-        return _make_static_response(INDEX_PATH)
+        return serve_index()
 
-    candidate_path = (APP_DIR / requested_path).resolve()
+    candidate_path = (DIST_DIR / requested_path).resolve()
     try:
-        candidate_path.relative_to(APP_DIR)
+        candidate_path.relative_to(DIST_DIR.resolve())
     except ValueError as error:
         raise HTTPException(status_code=404, detail="Not found") from error
 
     if candidate_path.is_file():
-        if "data" in candidate_path.relative_to(APP_DIR).parts:
-            raise HTTPException(status_code=404, detail="Not found")
         if candidate_path.suffix.lower() in ALLOWED_STATIC_EXTENSIONS:
             return _make_static_response(candidate_path)
 
+    if not INDEX_PATH.is_file():
+        raise HTTPException(status_code=503, detail="前端静态产物缺失，请先运行 npm run build:web。")
     return _make_static_response(INDEX_PATH)

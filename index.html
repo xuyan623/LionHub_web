@@ -13,28 +13,15 @@
     content="醒狮战队协作中枢：面向 RoboMaster 战队的成员管理、任务市场、积分结算与兵种项目协作平台。"
   >
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23050505'/%3E%3Cpath d='M18 18h28v8H34v22h-8V26H18z' fill='white'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="__APP_CSS__">
   <script>
     (function() {
-      // ========== 唯一版本号定义处，每次发版只改这里 ==========
-      var BUILD_VERSION = '20260515-ux-v13';
-      // =====================================================
-
+      var BUILD_VERSION = '20260516-boot-bundle-v1';
       window.BUILD_VERSION = BUILD_VERSION;
 
-      // 设置 meta build
       var meta = document.querySelector('meta[name="build"]');
       if (meta) meta.setAttribute('content', BUILD_VERSION);
 
-      // 动态加载 CSS
-      var cssFiles = ['base', 'layout', 'components', 'responsive'];
-      cssFiles.forEach(function(name) {
-        var link = document.createElement('link');
-        link.rel = 'stylesheet';
-        link.href = './css/' + name + '.css?v=' + BUILD_VERSION;
-        document.head.appendChild(link);
-      });
-
-      // 版本检测与缓存失效
       var BUILD_KEY = 'lion-hub-build-v1';
       var STALE_KEY = 'stale';
       var savedBuild = sessionStorage.getItem(BUILD_KEY);
@@ -46,11 +33,11 @@
       sessionStorage.setItem(BUILD_KEY, BUILD_VERSION);
 
       var LAST_VERSION_CHECK = 0;
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', function(event) {
         if (sessionStorage.getItem(STALE_KEY) === '1') {
           alert('检测到新版本，请刷新页面以加载最新内容。');
-          e.stopPropagation();
-          e.preventDefault();
+          event.stopPropagation();
+          event.preventDefault();
           return;
         }
         var now = Date.now();
@@ -81,12 +68,10 @@
 </head>
 <body>
   <div class="app-shell" id="app">
-    <div class="boot-screen" id="boot-screen">
-      <div class="boot-panel glass-card">
-        <div class="boot-mark">Lion Hub</div>
-        <h1>醒狮战队协作中枢</h1>
-        <p>正在装载成员、任务、审核与积分数据...</p>
-      </div>
+    <div class="boot-panel glass-card" style="max-width:520px;margin:64px auto;padding:32px">
+      <div class="boot-mark">Lion Hub</div>
+      <h1>醒狮战队协作中枢</h1>
+      <p>正在装载工作台壳层，并在后台同步成员、任务、审核与积分数据…</p>
     </div>
   </div>
   <script>
@@ -102,13 +87,6 @@
       }
     })();
   </script>
-  <script>
-    (function() {
-      var script = document.createElement('script');
-      script.type = 'module';
-      script.src = './app.js?v=' + window.BUILD_VERSION;
-      document.body.appendChild(script);
-    })();
-  </script>
+  <script type="module" src="__BOOTSTRAP_JS__"></script>
 </body>
 </html>

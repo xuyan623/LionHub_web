@@ -2,7 +2,8 @@ import { state, API_KEY_STORAGE_KEY, SESSION_KEY } from "../core/state.js";
 import { uid } from "../core/security.js";
 import { parseList } from "../core/utils.js";
 import { addRecord, removeWhere } from "../core/data-access.js";
-import { saveDatabase, saveSession } from "../core/database.js";
+import { saveDatabase } from "../core/database.js";
+import { saveSession } from "../core/session.js";
 import { clearModalStack } from "../core/modal.js";
 import { getRoleForIdentity, ensureVisibleRoute } from "./permissions.js";
 import { getCurrentUser, getMemberById, getApprovalById } from "./query.js";
@@ -48,7 +49,7 @@ export async function handleLogin(form) {
   state.authFeedback = "";
   await saveDatabase();
   if (state.rememberMe) {
-    saveSession();
+    saveSession(state.currentUserId);
   } else {
     localStorage.removeItem(SESSION_KEY);
   }
@@ -104,7 +105,7 @@ if (!username || !name || !email || !phone || !department || !password) {
 
   if (!(await saveDatabase())) return;
   state.currentUserId = userId;
-  saveSession();
+  saveSession(state.currentUserId);
   state.authFeedback = "";
   renderApp();
 }
@@ -166,7 +167,7 @@ export async function cancelPendingRegistration() {
   clearModalStack();
   state.authMode = "login";
   state.authFeedback = "";
-  saveSession();
+  saveSession(state.currentUserId);
   renderApp();
 }
 

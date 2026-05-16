@@ -1,25 +1,71 @@
-import { state, LEGACY_STORAGE_KEY, SESSION_KEY, SHARED_SYNC_INTERVAL_MS, setSharedSyncTimer } from "./state.js";
+import { dictionaries, LEGACY_STORAGE_KEY, SHARED_SYNC_INTERVAL_MS, state, setSharedSyncTimer } from "./state.js";
 import { requestJson, fetchDatabaseSnapshot, writeDatabaseSnapshot } from "./http.js";
-import { getRoleForIdentity, ensureVisibleRoute } from "../domain/permissions.js";
-import { cleanupOrphanedNotifications } from "../domain/notifications.js";
+import { renderApp, pushFlash } from "./services.js";
+import { loadSession } from "./session.js";
 import { initRouter, navigateTo } from "./router.js";
 
+let hydrationPromise = null;
 let sharedSyncTimer = null;
 
-export async function initialize() {
-  try {
-    state.database = await loadDatabase();
-    cleanupOrphanedNotifications();
-    state.currentUserId = loadSession();
-    state.route = _readHashRoute() || "dashboard";
-    state.initError = "";
-    ensureVisibleRoute();
-    initRouter();
-    startSharedDataSync();
-  } catch (error) {
-    console.error("Failed to initialize application:", error);
-    state.initError = formatInitializationError(error);
+export function initialize() {
+  state.currentUserId = loadSession();
+  state.route = _readHashRoute() || "dashboard";
+  state.initError = "";
+  state.databaseReady = false;
+  state.databaseHydrating = false;
+  clearLegacyLocalDatabase();
+  initRouter();
+  void hydrateDatabase();
+}
+
+export function ensureDatabaseReady() {
+  return hydrateDatabase();
+}
+
+async function hydrateDatabase() {
+  if (state.databaseReady) {
+    return state.database;
   }
+  if (hydrationPromise) {
+    return hydrationPromise;
+  }
+  state.databaseHydrating = true;
+  hydrationPromise = loadDatabase()
+    .then(async (database) => {
+      state.database = database;
+      state.databaseReady = true;
+      state.databaseHydrating = false;
+      state.initError = "";
+      await runPostHydrationTasks();
+      startSharedDataSync();
+      renderApp();
+      return database;
+    })
+    .catch((error) => {
+      console.error("Failed to hydrate application database:", error);
+      state.databaseReady = false;
+      state.databaseHydrating = false;
+      state.initError = formatInitializationError(error);
+      renderApp();
+      throw error;
+    })
+    .finally(() => {
+      hydrationPromise = null;
+    });
+  renderApp();
+  return hydrationPromise;
+}
+
+async function runPostHydrationTasks() {
+  if (!state.currentUserId) {
+    return;
+  }
+  const [{ cleanupOrphanedNotifications }, { ensureVisibleRoute }] = await Promise.all([
+    import("../domain/notifications.js"),
+    import("../domain/permissions.js"),
+  ]);
+  cleanupOrphanedNotifications();
+  ensureVisibleRoute();
 }
 
 function formatInitializationError(error) {
@@ -27,7 +73,6 @@ function formatInitializationError(error) {
 }
 
 export async function loadDatabase() {
-  clearLegacyLocalDatabase();
   const snapshot = await fetchDatabaseSnapshot();
   if (snapshot.database) {
     state.databaseVersion = Number(snapshot.version || 0);
@@ -43,7 +88,7 @@ function normalizeDatabaseRoles(database) {
     return;
   }
   for (const member of database.members) {
-    const expectedRole = getRoleForIdentity(member.identity);
+    const expectedRole = dictionaries.identityRoleMap[member.identity] || member.role;
     if (member.role !== expectedRole) {
       member.role = expectedRole;
     }
@@ -57,9 +102,9 @@ function migrateProgressNodes(database) {
       task.progressNodes = [];
     }
     if (!Array.isArray(task.comments)) continue;
-    const progressComments = task.comments.filter((c) => c.title === "进度更新");
+    const progressComments = task.comments.filter((comment) => comment.title === "进度更新");
     for (const comment of progressComments) {
-      const existing = task.progressNodes.some((n) => n.id === comment.id);
+      const existing = task.progressNodes.some((node) => node.id === comment.id);
       if (!existing) {
         task.progressNodes.push({
           id: comment.id,
@@ -89,18 +134,6 @@ export async function saveDatabase(database = state.database) {
   }
 }
 
-function loadSession() {
-  return localStorage.getItem(SESSION_KEY);
-}
-
-export function saveSession() {
-  if (state.currentUserId) {
-    localStorage.setItem(SESSION_KEY, state.currentUserId);
-  } else {
-    localStorage.removeItem(SESSION_KEY);
-  }
-}
-
 function clearLegacyLocalDatabase() {
   localStorage.removeItem(LEGACY_STORAGE_KEY);
 }
@@ -112,6 +145,8 @@ async function synchronizeDatabaseFromServer() {
       return false;
     }
     state.database = snapshot.database;
+    normalizeDatabaseRoles(state.database);
+    migrateProgressNodes(state.database);
     state.databaseVersion = Number(snapshot.version || 0);
     return true;
   } catch (error) {
@@ -127,11 +162,12 @@ function startSharedDataSync() {
   const timer = window.setInterval(() => {
     void refreshDatabaseQuietly();
   }, SHARED_SYNC_INTERVAL_MS);
+  sharedSyncTimer = timer;
   setSharedSyncTimer(timer);
 }
 
 export async function refreshDatabaseQuietly() {
-  if (!state.database || state.initError || shouldPauseSharedSync()) {
+  if (!state.databaseReady || !state.database || state.initError || shouldPauseSharedSync()) {
     return;
   }
   try {
@@ -141,13 +177,13 @@ export async function refreshDatabaseQuietly() {
       return;
     }
     if (diffResult.database) {
-      // Server returned full snapshot (diff unavailable or gap too large)
       state.database = diffResult.database;
+      normalizeDatabaseRoles(state.database);
+      migrateProgressNodes(state.database);
     } else if (diffResult.diff) {
       applyDiff(state.database, diffResult.diff);
     }
     state.databaseVersion = serverVersion;
-    const { renderApp } = await import("../render/core.js");
     renderApp();
   } catch (error) {
     console.error("Shared sync skipped:", error);
@@ -161,19 +197,20 @@ function applyDiff(database, diff) {
     if (!changes) continue;
     const list = database[key];
     if (!Array.isArray(list)) continue;
-    // Remove
     for (const id of changes.removed || []) {
-      const idx = list.findIndex((item) => item.id === id);
-      if (idx !== -1) list.splice(idx, 1);
+      const index = list.findIndex((item) => item.id === id);
+      if (index !== -1) {
+        list.splice(index, 1);
+      }
     }
-    // Update
     for (const item of changes.updated || []) {
-      const existing = list.find((i) => i.id === item.id);
-      if (existing) Object.assign(existing, item);
+      const existing = list.find((current) => current.id === item.id);
+      if (existing) {
+        Object.assign(existing, item);
+      }
     }
-    // Add
     for (const item of changes.added || []) {
-      if (!list.some((i) => i.id === item.id)) {
+      if (!list.some((current) => current.id === item.id)) {
         list.unshift(item);
       }
     }
@@ -207,7 +244,6 @@ function shouldPauseSharedSync() {
 async function recoverFromPersistenceFailure(error) {
   console.error("Failed to persist shared database:", error);
   const synchronized = await synchronizeDatabaseFromServer();
-  const { pushFlash } = await import("../render/core.js");
   if (error.status === 409) {
     pushFlash(
       synchronized
@@ -233,5 +269,3 @@ function _readHashRoute() {
 }
 
 export { navigateTo };
-
-

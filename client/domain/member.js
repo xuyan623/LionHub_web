@@ -1,7 +1,8 @@
 import { state, dictionaries } from "../core/state.js";
 import { uid, hashPassword } from "../core/security.js";
 import { parseList, clamp, toArray, joinOr } from "../core/utils.js";
-import { saveDatabase, saveSession } from "../core/database.js";
+import { saveDatabase } from "../core/database.js";
+import { saveSession } from "../core/session.js";
 import { clearModalStack, popModal } from "../core/modal.js";
 import { getRoleForIdentity, ensureVisibleRoute, canDeleteAllGeneratedData, canMemberParticipateInTasks, isRetiredMember, isDisabledMember, getLifecycleBlockingTasks } from "./permissions.js";
 import { getCurrentUser, getCurrentMember, getMemberById, getLifecycleActionDefinition } from "./query.js";
@@ -106,7 +107,7 @@ async function executeSensitiveMemberAction(actionConfig) {
   member.memberStatus = targetStatus;
   if (user) user.status = targetUserStatus;
   if (!(await saveDatabase())) return false;
-  if (actionKey === "disable-member" && user?.id === state.currentUserId) saveSession();
+  if (actionKey === "disable-member" && user?.id === state.currentUserId) saveSession(state.currentUserId);
   pushFlash(successMessage, "info");
   return true;
 }
