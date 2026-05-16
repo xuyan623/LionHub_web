@@ -374,6 +374,14 @@ export async function joinTask(taskId) {
   const member = getCurrentMember();
   if (!task || !member) return;
   if (!canInteractWithTasks()) { pushFlash("当前成员状态为只读，不参与普通任务操作。", "info"); return; }
+  if (task.status === "completed") {
+    pushFlash("已完成任务不能再领取。", "info");
+    return;
+  }
+  if (task.status === "pending_review") {
+    pushFlash("当前任务正在审核中，不能再领取。", "info");
+    return;
+  }
   if (getActiveParticipantCount(task.id) >= task.maxParticipants) {
     pushFlash("任务人数已满，当前版本不提供候补机制。", "info"); return;
   }

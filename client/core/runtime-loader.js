@@ -1,8 +1,9 @@
 import { renderApp } from "./services.js";
+import { renderMarketPage } from "../render/pages.js";
 
 const routeLoaders = {
   dashboard: () => import("../render/routes/dashboard.js"),
-  market: () => import("../render/routes/market.js"),
+  market: () => Promise.resolve({ render: renderMarketPage }),
   myTasks: () => import("../render/routes/my-tasks.js"),
   taskManagement: () => import("../render/routes/task-management.js"),
   members: () => import("../render/routes/members.js"),

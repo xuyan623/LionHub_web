@@ -113,6 +113,7 @@ export const options = {
   robotGroups: ["步兵", "哨兵", "英雄", "工程", "无人机", "飞镖", "雷达"],
   taskTypes: Object.keys(dictionaries.taskTypes),
   taskStatuses: Object.keys(dictionaries.taskStatuses),
+  marketTaskStatuses: ["market_open", ...Object.keys(dictionaries.taskStatuses)],
   priorities: Object.keys(dictionaries.priorities),
   difficulties: Object.keys(dictionaries.difficulties),
   roles: Object.keys(dictionaries.roles),
@@ -153,7 +154,7 @@ const DEFAULT_MARKET_FILTERS = {
   direction: "all",
   robotGroup: "all",
   difficulty: "all",
-  status: "all",
+  status: "market_open",
   audience: "",
 };
 

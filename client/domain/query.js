@@ -187,7 +187,8 @@ export function getFilteredMarketTasks() {
     if (state.marketFilters.direction !== "all" && !toArray(task.directions || task.direction).includes(state.marketFilters.direction)) return false;
     if (state.marketFilters.robotGroup !== "all" && !toArray(task.robotGroups || task.robotGroup).includes(state.marketFilters.robotGroup)) return false;
     if (state.marketFilters.difficulty !== "all" && task.difficulty !== state.marketFilters.difficulty) return false;
-    if (state.marketFilters.status !== "all" && task.status !== state.marketFilters.status) return false;
+    if (state.marketFilters.status === "market_open" && task.status === "completed") return false;
+    if (state.marketFilters.status !== "all" && state.marketFilters.status !== "market_open" && task.status !== state.marketFilters.status) return false;
     if (audienceQuery && !task.recommendedFor.toLowerCase().includes(audienceQuery)) return false;
     return true;
   });
@@ -354,6 +355,7 @@ export function getMemberPointTransactions(memberId) {
 export function getJoinActionLabel(task) {
   const currentMember = getCurrentMember();
   if (!currentMember || currentMember.role === "teacher") return "";
+  if (task.status === "completed" || task.status === "pending_review") return "";
   const participant = getTaskParticipantRecords(task.id).find((item) => item.memberId === currentMember.id && item.status !== "exited");
   if (participant) return "";
   const pendingApproval = state.database.approvals.find((approval) => approval.type === "join" && approval.targetId === task.id && approval.submitterId === currentMember.id && approval.status === "pending");

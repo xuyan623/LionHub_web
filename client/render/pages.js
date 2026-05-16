@@ -61,6 +61,7 @@ export function renderDashboardPage() {
 
 export function renderMarketPage() {
   const tasks = getFilteredMarketTasks();
+  const marketStatusLabels = { market_open: "未完成", ...dictionaries.taskStatuses };
   return `
     <section>
       <div class="panel market-board">
@@ -89,7 +90,7 @@ export function renderMarketPage() {
           </div>
           <div class="field-grid-3">
             ${renderFilterSelect("难度", "market", "difficulty", state.marketFilters.difficulty, options.difficulties, dictionaries.difficulties)}
-            ${renderFilterSelect("状态", "market", "status", state.marketFilters.status, options.taskStatuses, dictionaries.taskStatuses)}
+            ${renderFilterSelect("状态", "market", "status", state.marketFilters.status, options.marketTaskStatuses, marketStatusLabels)}
             ${renderFilterField("推荐适合人群", "market", "audience", state.marketFilters.audience, "text", "如 机械组新人 / 算法梯队")}
           </div>
         </div>
