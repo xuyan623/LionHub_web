@@ -5,8 +5,8 @@ const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   "/",
   "/index.html",
-  "/assets/bootstrap-WSK2AOMJ.js",
-  "/assets/styles-4Q26F2YW.css"
+  "/assets/bootstrap-GBJLN345.js",
+  "/assets/styles-FV43M7CN.css"
 ];
 
 self.addEventListener("install", (event) => {

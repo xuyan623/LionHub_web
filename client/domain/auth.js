@@ -2,7 +2,7 @@ import { state, API_KEY_STORAGE_KEY, SESSION_KEY } from "../core/state.js";
 import { uid } from "../core/security.js";
 import { parseList } from "../core/utils.js";
 import { addRecord, removeWhere } from "../core/data-access.js";
-import { saveDatabase } from "../core/database.js";
+import { ensureDatabaseReady, ensureSharedDataSync, saveDatabase } from "../core/database.js";
 import { saveSession } from "../core/session.js";
 import { clearModalStack } from "../core/modal.js";
 import { getRoleForIdentity, ensureVisibleRoute } from "./permissions.js";
@@ -21,38 +21,47 @@ export async function handleLogin(form) {
     renderApp();
     return;
   }
-  const user = state.database.users.find((item) => item.email.toLowerCase() === email);
-  if (!user) {
-    state.authFeedback = "账号不存在，请确认邮箱或先注册。";
-    renderApp();
-    return;
-  }
-  if (user.passwordHash !== password) {
-    state.authFeedback = "密码错误，请重新输入。";
-    renderApp();
-    return;
-  }
+
+  let authResult;
   try {
-    const authResult = await requestJson("/api/auth", {
+    authResult = await requestJson("/api/auth", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-    if (authResult?.apiKey) {
-      sessionStorage.setItem(API_KEY_STORAGE_KEY, authResult.apiKey);
-    }
-  } catch {
+  } catch (error) {
+    sessionStorage.removeItem(API_KEY_STORAGE_KEY);
+    state.authFeedback = error instanceof Error && error.message ? error.message : "登录失败，请稍后重试。";
+    renderApp();
+    return;
+  }
+
+  if (authResult?.apiKey) {
+    sessionStorage.setItem(API_KEY_STORAGE_KEY, authResult.apiKey);
+  } else {
     sessionStorage.removeItem(API_KEY_STORAGE_KEY);
   }
-  user.lastLoginAt = new Date().toISOString();
-  state.currentUserId = user.id;
+
+  state.currentUserId = authResult.userId;
   state.authFeedback = "";
+  await ensureDatabaseReady();
+
+  const user = getCurrentUser();
+  if (!user) {
+    state.currentUserId = null;
+    state.authFeedback = "登录后未找到账号数据，请刷新页面后重试。";
+    renderApp();
+    return;
+  }
+
+  user.lastLoginAt = new Date().toISOString();
   await saveDatabase();
   if (state.rememberMe) {
     saveSession(state.currentUserId);
   } else {
     localStorage.removeItem(SESSION_KEY);
   }
+  ensureSharedDataSync();
   ensureVisibleRoute();
   renderApp();
 }
@@ -106,6 +115,7 @@ if (!username || !name || !email || !phone || !department || !password) {
   if (!(await saveDatabase())) return;
   state.currentUserId = userId;
   saveSession(state.currentUserId);
+  ensureSharedDataSync();
   state.authFeedback = "";
   renderApp();
 }

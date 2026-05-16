@@ -135,8 +135,8 @@ function renderInitializationErrorShell() {
 
 function renderAuthShell() {
   const hydrationMessage = state.databaseHydrating
-    ? "正在连接共享服务。你可以先填写表单，提交时会自动等待数据同步完成。"
-    : "共享服务已就绪。";
+    ? "正在连接共享服务。提交注册或登录后会继续同步所需数据。"
+    : "首屏不会自动拉取全量共享数据，只有登录成功或提交注册时才会同步。";
   return `
     <div class="auth-layout">
       <section class="auth-panel">

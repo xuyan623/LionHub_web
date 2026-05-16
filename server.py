@@ -12,7 +12,8 @@ from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from backend.config import (
@@ -23,6 +24,7 @@ from backend.config import (
     DB_PATH,
     DIST_DIR,
     INDEX_PATH,
+    RATE_LIMIT_DB_PATH,
     UPLOADS_DIR,
 )
 from backend.files import (
@@ -36,6 +38,10 @@ from backend.store import SharedDatabaseStore
 
 
 app = FastAPI(title="Lion Hub Local Server")
+app.add_middleware(
+    GZipMiddleware,
+    minimum_size=1024,
+)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -72,7 +78,8 @@ def _check_rate_limit(ip: str) -> bool:
     now = time.time()
     cutoff = now - _RATE_LIMIT_WINDOW
     try:
-        with sqlite3.connect(DB_PATH) as conn:
+        RATE_LIMIT_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(RATE_LIMIT_DB_PATH) as conn:
             _ensure_rate_limit_schema(conn)
             _prune_rate_limits(conn)
             row = conn.execute(
@@ -108,6 +115,7 @@ CACHE_CONTROL_NO_CACHE = "no-cache, no-store, must-revalidate"
 CACHE_CONTROL_IMMUTABLE = "public, max-age=31536000, immutable"
 CACHE_CONTROL_REVALIDATE = "public, max-age=0, must-revalidate"
 HASHED_ASSET_PATH = re.compile(r"^assets/.+-[A-Z0-9]{8,}\.[a-z0-9]+$")
+PRECOMPRESSIBLE_EXTENSIONS = {".css", ".html", ".js", ".json", ".map", ".svg", ".txt"}
 
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -125,12 +133,35 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
-def _make_static_response(file_path: Path) -> FileResponse:
-    response = FileResponse(file_path)
+def _make_static_response(file_path: Path, request: Request | None = None) -> FileResponse:
+    serve_path, content_encoding = _select_static_variant(
+        file_path,
+        request.headers.get("accept-encoding", "") if request is not None else "",
+    )
+    media_type, _ = mimetypes.guess_type(file_path.name)
+    response = FileResponse(serve_path, media_type=media_type)
     response.headers["Cache-Control"] = _get_cache_control(file_path)
+    response.headers["Vary"] = "Accept-Encoding"
+    if content_encoding:
+        response.headers["Content-Encoding"] = content_encoding
     for header, value in SECURITY_HEADERS.items():
         response.headers.setdefault(header, value)
     return response
+
+
+def _select_static_variant(file_path: Path, accept_encoding: str) -> tuple[Path, str | None]:
+    if file_path.suffix.lower() not in PRECOMPRESSIBLE_EXTENSIONS:
+        return file_path, None
+
+    normalized = accept_encoding.lower()
+    brotli_path = file_path.with_name(f"{file_path.name}.br")
+    gzip_path = file_path.with_name(f"{file_path.name}.gz")
+
+    if "br" in normalized and brotli_path.is_file():
+        return brotli_path, "br"
+    if "gzip" in normalized and gzip_path.is_file():
+        return gzip_path, "gzip"
+    return file_path, None
 
 
 def _get_cache_control(file_path: Path) -> str:
@@ -191,10 +222,12 @@ def authenticate(payload: AuthPayload, request: Request) -> dict:
             break
     if not user or not _verify_password(payload.password, user.get("passwordHash", "")):
         raise HTTPException(status_code=401, detail="邮箱或密码错误。")
-    if user.get("status") not in ("active",):
-        raise HTTPException(status_code=403, detail="账号未激活或已被停用。")
     api_key = _load_api_key()
-    return {"userId": user["id"], "apiKey": api_key}
+    return {
+        "userId": user["id"],
+        "status": user.get("status", "pending"),
+        "apiKey": api_key,
+    }
 
 
 @app.get("/api/health")
@@ -365,19 +398,19 @@ def serve_uploaded_file(requested_path: str, downloadName: str | None = None) ->
 
 
 @app.get("/", include_in_schema=False)
-def serve_index() -> FileResponse:
+def serve_index(request: Request) -> FileResponse:
     if not INDEX_PATH.is_file():
         raise HTTPException(status_code=503, detail="前端静态产物缺失，请先运行 npm run build:web。")
-    return _make_static_response(INDEX_PATH)
+    return _make_static_response(INDEX_PATH, request)
 
 
 @app.get("/{requested_path:path}", include_in_schema=False)
-def serve_static_asset(requested_path: str) -> FileResponse:
+def serve_static_asset(requested_path: str, request: Request) -> FileResponse:
     if requested_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="Not found")
 
     if not requested_path:
-        return serve_index()
+        return serve_index(request)
 
     candidate_path = (DIST_DIR / requested_path).resolve()
     try:
@@ -387,8 +420,8 @@ def serve_static_asset(requested_path: str) -> FileResponse:
 
     if candidate_path.is_file():
         if candidate_path.suffix.lower() in ALLOWED_STATIC_EXTENSIONS:
-            return _make_static_response(candidate_path)
+            return _make_static_response(candidate_path, request)
 
     if not INDEX_PATH.is_file():
         raise HTTPException(status_code=503, detail="前端静态产物缺失，请先运行 npm run build:web。")
-    return _make_static_response(INDEX_PATH)
+    return _make_static_response(INDEX_PATH, request)

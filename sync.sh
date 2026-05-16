@@ -4,9 +4,46 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
-BACKUP_DIR="/tmp/lion_hub_data_backup"
+TARGET_REF="origin/master"
+CURRENT_REV="$(git rev-parse HEAD)"
+BUILD_DIR="$(mktemp -d /tmp/lion_hub_release_build.XXXXXX)"
+BACKUP_ROOT="$(mktemp -d /tmp/lion_hub_release_backup.XXXXXX)"
+BACKUP_DIR="$BACKUP_ROOT/data"
+FRONTEND_HASH_FILE="$SCRIPT_DIR/node_modules/.package-lock.sha256"
+ROLLBACK_REQUIRED=0
+SERVER_WAS_RUNNING=0
+TARGET_NODE_MODULES_UPDATED=0
 
 echo "[*] Syncing Lion Hub from GitHub..."
+
+cleanup() {
+  rm -rf "$BUILD_DIR" "$BACKUP_ROOT"
+}
+
+rollback() {
+  if [ "$ROLLBACK_REQUIRED" -ne 1 ]; then
+    return
+  fi
+
+  echo "[!] Sync failed after service stop. Rolling back to $CURRENT_REV..."
+  git reset --hard "$CURRENT_REV"
+
+  if [ -d "$BACKUP_DIR" ]; then
+    rm -rf data
+    cp -r "$BACKUP_DIR" data
+  fi
+
+  chmod +x start_server.sh sync.sh
+  if [ "$SERVER_WAS_RUNNING" -eq 1 ]; then
+    ./start_server.sh start || true
+  fi
+}
+
+trap 'status=$?; if [ $status -ne 0 ]; then rollback; fi; cleanup; exit $status' EXIT
+
+file_sha256() {
+  sha256sum "$1" | awk '{print $1}'
+}
 
 ensure_frontend_build_deps() {
   if ! command -v node >/dev/null 2>&1; then
@@ -24,59 +61,115 @@ ensure_frontend_build_deps() {
   fi
 }
 
-build_frontend() {
+prepare_release_tree() {
+  echo "[*] Fetching latest code..."
+  git fetch origin
+  git archive "$TARGET_REF" | tar -x -C "$BUILD_DIR"
+  echo "[✓] Release candidate exported to $BUILD_DIR"
+}
+
+preflight_python_deps() {
+  echo "[*] Validating Python dependencies against release candidate..."
+  chmod +x "$SCRIPT_DIR/start_server.sh"
+  "$SCRIPT_DIR/start_server.sh" ensure-deps "$BUILD_DIR/requirements.txt"
+}
+
+prepare_frontend_deps() {
   ensure_frontend_build_deps
 
-  echo "[*] Installing frontend dependencies..."
-  if [ -f "package-lock.json" ]; then
-    npm ci --no-audit --no-fund
-  else
-    npm install --no-audit --no-fund
+  local build_lock_file="$BUILD_DIR/package-lock.json"
+  if [ -f "$build_lock_file" ] && [ -d "$SCRIPT_DIR/node_modules" ] && [ -f "$FRONTEND_HASH_FILE" ]; then
+    local current_hash
+    current_hash="$(cat "$FRONTEND_HASH_FILE")"
+    local target_hash
+    target_hash="$(file_sha256 "$build_lock_file")"
+    if [ "$current_hash" = "$target_hash" ]; then
+      echo "[i] Frontend dependencies unchanged, reusing node_modules cache"
+      ln -s "$SCRIPT_DIR/node_modules" "$BUILD_DIR/node_modules"
+      return 0
+    fi
   fi
 
+  echo "[*] Installing frontend dependencies for release candidate..."
+  if [ -f "$build_lock_file" ]; then
+    (
+      cd "$BUILD_DIR"
+      npm ci --no-audit --no-fund
+    )
+    printf "%s" "$(file_sha256 "$build_lock_file")" > "$BUILD_DIR/node_modules/.package-lock.sha256"
+  else
+    (
+      cd "$BUILD_DIR"
+      npm install --no-audit --no-fund
+    )
+  fi
+  TARGET_NODE_MODULES_UPDATED=1
+}
+
+build_frontend() {
+  prepare_frontend_deps
   echo "[*] Building frontend assets..."
-  npm run build:web
+  (
+    cd "$BUILD_DIR"
+    npm run build:web
+  )
   echo "[✓] Frontend assets rebuilt"
 }
 
-# 1. Stop server if running
-if [ -f ".server.pid" ] && kill -0 "$(cat ".server.pid")" 2>/dev/null; then
-  echo "[*] Stopping server..."
-  kill "$(cat ".server.pid")"
-  rm -f ".server.pid"
-  sleep 1
-  echo "[✓] Server stopped"
-else
-  echo "[i] Server is not running"
-fi
+stop_server_if_running() {
+  if [ -f ".server.pid" ] && kill -0 "$(cat ".server.pid")" 2>/dev/null; then
+    SERVER_WAS_RUNNING=1
+    echo "[*] Stopping server..."
+    kill "$(cat ".server.pid")"
+    rm -f ".server.pid"
+    sleep 1
+    echo "[✓] Server stopped"
+  else
+    echo "[i] Server is not running"
+  fi
+}
 
-# 2. Backup entire data directory
-if [ -d "data" ]; then
-  rm -rf "$BACKUP_DIR"
-  cp -r data "$BACKUP_DIR"
-  echo "[✓] Data directory backed up"
-fi
+backup_live_data() {
+  if [ -d "data" ]; then
+    cp -r data "$BACKUP_DIR"
+    echo "[✓] Live data directory backed up"
+  fi
+}
 
-# 3. Fetch and force overwrite to match GitHub
-git fetch origin
-git reset --hard origin/master
-echo "[✓] Code synced from GitHub"
+deploy_release_tree() {
+  git reset --hard "$TARGET_REF"
+  echo "[✓] Code synced from GitHub"
 
-# 4. Restore data directory (preserve phone-side live data)
-if [ -d "$BACKUP_DIR" ]; then
-  rm -rf data
-  cp -r "$BACKUP_DIR" data
-  rm -rf "$BACKUP_DIR"
-  echo "[✓] Data directory restored"
-fi
+  if [ -d "$BACKUP_DIR" ]; then
+    rm -rf data
+    cp -r "$BACKUP_DIR" data
+    echo "[✓] Live data directory restored"
+  fi
 
-# 5. Rebuild frontend for the pulled source tree
+  rm -rf dist
+  cp -r "$BUILD_DIR/dist" dist
+  echo "[✓] Fresh dist artifacts deployed"
+
+  if [ "$TARGET_NODE_MODULES_UPDATED" -eq 1 ] && [ -d "$BUILD_DIR/node_modules" ] && [ ! -L "$BUILD_DIR/node_modules" ]; then
+    rm -rf node_modules
+    cp -a "$BUILD_DIR/node_modules" node_modules
+    echo "[✓] node_modules cache updated"
+  fi
+}
+
+prepare_release_tree
 build_frontend
+preflight_python_deps
 
-# 6. Restart server in background
+stop_server_if_running
+backup_live_data
+ROLLBACK_REQUIRED=1
+deploy_release_tree
+
 echo "[*] Starting server..."
 chmod +x start_server.sh sync.sh
 ./start_server.sh start
+ROLLBACK_REQUIRED=0
 
 echo ""
 echo "[✓] Sync complete! Server restarted."

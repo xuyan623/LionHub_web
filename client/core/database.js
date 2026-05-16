@@ -15,11 +15,19 @@ export function initialize() {
   state.databaseHydrating = false;
   clearLegacyLocalDatabase();
   initRouter();
-  void hydrateDatabase();
+  if (state.currentUserId) {
+    void hydrateDatabase();
+  }
 }
 
 export function ensureDatabaseReady() {
   return hydrateDatabase();
+}
+
+export function ensureSharedDataSync() {
+  if (state.currentUserId) {
+    startSharedDataSync();
+  }
 }
 
 async function hydrateDatabase() {
@@ -37,7 +45,7 @@ async function hydrateDatabase() {
       state.databaseHydrating = false;
       state.initError = "";
       await runPostHydrationTasks();
-      startSharedDataSync();
+      ensureSharedDataSync();
       renderApp();
       return database;
     })
@@ -167,7 +175,7 @@ function startSharedDataSync() {
 }
 
 export async function refreshDatabaseQuietly() {
-  if (!state.databaseReady || !state.database || state.initError || shouldPauseSharedSync()) {
+  if (!state.currentUserId || !state.databaseReady || !state.database || state.initError || shouldPauseSharedSync()) {
     return;
   }
   try {

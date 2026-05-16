@@ -5,16 +5,43 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
 PID_FILE="$SCRIPT_DIR/.server.pid"
-LOG_FILE="$SCRIPT_DIR/server.log"
+LOG_DIR="$SCRIPT_DIR/logs"
+LOG_FILE="$LOG_DIR/server.log"
+REQ_HASH_FILE="$SCRIPT_DIR/.venv/.requirements.sha256"
 
-ensure_deps() {
+file_sha256() {
+  sha256sum "$1" | awk '{print $1}'
+}
+
+ensure_venv() {
   if [ ! -d ".venv" ]; then
     echo "[*] Creating virtual environment..."
     python3 -m venv .venv
   fi
+}
+
+ensure_python_deps() {
+  local requirements_file="${1:-$SCRIPT_DIR/requirements.txt}"
+
+  ensure_venv
   source .venv/bin/activate
-  echo "[*] Installing dependencies..."
-  pip install -q -r requirements.txt
+
+  local target_hash
+  target_hash="$(file_sha256 "$requirements_file")"
+  local current_hash=""
+  if [ -f "$REQ_HASH_FILE" ]; then
+    current_hash="$(cat "$REQ_HASH_FILE")"
+  fi
+
+  if [ "$target_hash" = "$current_hash" ]; then
+    echo "[i] Python dependencies unchanged"
+    return 0
+  fi
+
+  echo "[*] Installing Python dependencies..."
+  pip install -q -r "$requirements_file"
+  printf "%s" "$target_hash" > "$REQ_HASH_FILE"
+  echo "[✓] Python dependencies updated"
 }
 
 start_server() {
@@ -24,7 +51,8 @@ start_server() {
     return 0
   fi
 
-  ensure_deps
+  ensure_python_deps "$SCRIPT_DIR/requirements.txt"
+  mkdir -p "$LOG_DIR"
 
   nohup python3 -m uvicorn server:app --host 0.0.0.0 --port 4173 \
     > "$LOG_FILE" 2>&1 &
@@ -82,6 +110,7 @@ show_logs() {
 
 case "${1:-start}" in
   start)   start_server ;;
+  ensure-deps) ensure_python_deps "${2:-$SCRIPT_DIR/requirements.txt}" ;;
   stop)    stop_server ;;
   restart) stop_server; sleep 1; start_server ;;
   status)  show_status ;;
