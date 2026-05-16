@@ -4,6 +4,7 @@ import { formatDateTime, formatShortDate } from "../core/format.js";
 import { truncate, getInitials, toArray, joinOr } from "../core/utils.js";
 import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecords, getTaskParticipantRecordsByMember, getMemberPointSummary, getMemberLoads, getActiveParticipantCount, getJoinActionLabel, getApprovalById, getAttachmentsIndex } from "../domain/query.js";
 import { canReview, canDeleteAllGeneratedData, canDeleteTaskGeneratedData, canInteractWithTasks, canDeletePointTransaction, canDeleteApprovalRecord, isAdmin, isRetiredMember, isDisabledMember, canMemberBeAddedToTask, getLifecycleBlockingTasks, isTaskOpenStatus } from "../domain/permissions.js";
+import { getLatestSubmissionSummary } from "../domain/task.js";
 
 export function renderSelectOptions(values, selectedValue = "", labels = null) {
   return values.map((value) => {
@@ -167,6 +168,7 @@ export function renderApprovalCard(approval) {
   const target = resolveApprovalTarget(approval);
   const isPending = approval.status === "pending";
   const detailButton = renderApprovalDetailButton(approval);
+  const helperText = resolveApprovalHelperText(approval);
   return `
     <div class="approval-card">
       <div class="section-header">
@@ -186,7 +188,7 @@ export function renderApprovalCard(approval) {
         ${approval.type === "completion" && isPending ? `<button class="button-secondary" type="button" data-action="return-completion" data-approval-id="${approval.id}">驳回修改</button>` : ""}
         ${canDeleteApprovalRecord(approval) ? `<button class="button-danger" type="button" data-action="delete-approval" data-approval-id="${approval.id}">删除记录</button>` : ""}
       </div>
-      ${approval.comment ? `<div class="helper-text">${escapeHtml(approval.comment)}</div>` : ""}
+      ${helperText ? `<div class="helper-text">${escapeHtml(helperText)}</div>` : ""}
     </div>
   `;
 }
@@ -217,6 +219,14 @@ export function renderApprovalPreview(approval) {
       <p>${escapeHtml(approval.comment)}</p>
     </div>
   `;
+}
+
+function resolveApprovalHelperText(approval) {
+  if (approval.type === "completion") {
+    const task = getTaskById(approval.targetId);
+    return task ? getLatestSubmissionSummary(task) || approval.comment || "" : approval.comment || "";
+  }
+  return approval.comment || "";
 }
 
 export function renderLoadRow(entry) {
@@ -439,7 +449,10 @@ function resolveApprovalTarget(approval) {
   if (["join", "completion", "settlement"].includes(approval.type)) {
     const task = getTaskById(approval.targetId);
     const submitter = getMemberById(approval.submitterId);
-    return { title: task ? task.title : "未知任务", subtitle: `${submitter?.name || "未知成员"} 提交 · ${task?.department || "未指定部门"} / ${task?.robotGroup || "通用"}` };
+    return {
+      title: task ? task.title : "未知任务",
+      subtitle: `${submitter?.name || "未知成员"} 提交 · ${joinOr(task?.departments || task?.department, "未指定部门")} / ${joinOr(task?.robotGroups || task?.robotGroup, "通用")}`,
+    };
   }
   if (["compensation", "promotion", "status_change"].includes(approval.type)) {
     const member = getMemberById(approval.targetId);

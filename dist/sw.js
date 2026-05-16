@@ -5,7 +5,7 @@ const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   "/",
   "/index.html",
-  "/assets/bootstrap-GBJLN345.js",
+  "/assets/bootstrap-BNP634C5.js",
   "/assets/styles-FV43M7CN.css"
 ];
 

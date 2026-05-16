@@ -1541,11 +1541,12 @@ web_build/
 ├── logs/                   # 运行日志输出目录
 ├── scripts/                # 构建、诊断与辅助脚本
 ├── frontend/               # 前端模板入口（app, index, sw, bundle）
+├── menu.sh                 # 根目录指令菜单脚本
 ├── start_server.ps1        # Windows 启动脚本
 ├── start_server.sh         # Linux/Termux 启动脚本
 ├── sync.sh                 # 代码同步脚本（保留数据库）
 ├── backup_db.sh            # 数据库备份脚本
-└── scripts/ops/help.sh     # 帮助菜单脚本
+└── scripts/commands/       # 指令动作脚本目录
 ```
 
 ---
@@ -1579,7 +1580,7 @@ chmod +x start_server.sh
 ./start_server.sh logs     # 查看日志
 ./sync.sh                  # 从 GitHub 同步代码（保留数据库）
 ./backup_db.sh             # 备份数据库到 GitHub
-./scripts/ops/help.sh      # 交互式帮助菜单
+bash menu.sh              # 交互式指令菜单
 ```
 
 ### 26.3 手机后台常驻

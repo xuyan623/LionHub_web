@@ -97,7 +97,13 @@ function renderCurrentPage() {
     void loadRouteChunk(routeId);
     return renderPageLoadingState(routeId);
   }
-  return routeModule.render();
+  const renderRoute = resolveRouteRenderer(routeId, routeModule);
+  if (!renderRoute) {
+    console.error("Route chunk has no callable renderer:", routeId, routeModule);
+    void loadRouteChunk(routeId);
+    return renderPageLoadingState(routeId);
+  }
+  return renderRoute();
 }
 
 function renderPageLoadingState(routeId) {
@@ -173,5 +179,44 @@ function renderNotifPanel() {
     </div>
   `;
 }
+
+function resolveRouteRenderer(routeId, routeModule) {
+  if (!routeModule) {
+    return null;
+  }
+
+  if (typeof routeModule.render === "function") {
+    return routeModule.render;
+  }
+
+  if (typeof routeModule.default === "function") {
+    return routeModule.default;
+  }
+
+  if (routeModule.default && typeof routeModule.default.render === "function") {
+    return routeModule.default.render;
+  }
+
+  const exportName = routeRenderExportMap[routeId] || routeRenderExportMap.dashboard;
+  if (typeof routeModule[exportName] === "function") {
+    return routeModule[exportName];
+  }
+
+  const firstFunction = Object.values(routeModule).find((value) => typeof value === "function");
+  return typeof firstFunction === "function" ? firstFunction : null;
+}
+
+const routeRenderExportMap = {
+  dashboard: "renderDashboardPage",
+  market: "renderMarketPage",
+  myTasks: "renderMyTasksPage",
+  taskManagement: "renderTaskManagementPage",
+  members: "renderMembersPage",
+  projects: "renderProjectsPage",
+  rankings: "renderRankingsPage",
+  reviews: "renderReviewsPage",
+  profile: "renderProfilePage",
+  settings: "renderSettingsPage",
+};
 
 export { renderNotifIcon, renderNotifPanel, getMemberById };

@@ -497,6 +497,10 @@ export function renderApprovalActionModal() {
   const isApprovable = approval.status === "pending" && canReview();
   const actionMap = { join: "approve-join", completion: "approve-completion", promotion: "approve-promotion", status_change: "approve-status-change" };
   const approveAction = actionMap[approval.type];
+  const isCompletionApproval = approval.type === "completion";
+  const task = isCompletionApproval ? getTaskById(approval.targetId) : null;
+  const submissionSummary = task ? getLatestSubmissionSummary(task) : "";
+  const submissionAttachments = task ? getSubmissionAttachments(task) : [];
   return `
     <div class="modal">
       <div class="modal-card glass-card">
@@ -504,10 +508,27 @@ export function renderApprovalActionModal() {
           <div><h3>${escapeHtml(dictionaries.approvalTypes[approval.type] || "审核")}</h3><p>${escapeHtml(target.subtitle)}</p></div>
           <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
         </div>
-        ${approval.comment ? `<section class="panel"><div class="comment-card"><p>${escapeHtml(approval.comment)}</p></div></section>` : ""}
+        ${isCompletionApproval && task ? `
+          <section class="panel">
+            <div class="definition-list">
+              <div class="definition-row"><span>任务标题</span><strong>${escapeHtml(task.title)}</strong></div>
+              <div class="definition-row"><span>提交成员</span><strong>${escapeHtml(getMemberById(approval.submitterId)?.name || "未知成员")}</strong></div>
+              <div class="definition-row"><span>部门 / 方向 / 兵种</span><strong>${escapeHtml(joinOr(task.departments || task.department, "未指定部门"))} / ${escapeHtml(joinOr(task.directions || task.direction, "未指定方向"))} / ${escapeHtml(joinOr(task.robotGroups || task.robotGroup, "通用"))}</strong></div>
+            </div>
+          </section>
+          <section class="panel">
+            <div class="section-header"><div><h3>成果说明</h3><p>这里展示成员提交审核时填写的真实成果说明，而不是固定审核文案。</p></div></div>
+            <div class="comment-card"><p>${escapeHtml(submissionSummary || "当前没有找到成果说明。")}</p></div>
+          </section>
+          <section class="panel">
+            <div class="section-header"><div><h3>提交附件</h3><p>如果成员在提交审核时上传了附件，会在这里展示。</p></div></div>
+            <div class="comment-list">${submissionAttachments.length ? submissionAttachments.map((attachment) => renderAttachmentCard(attachment)).join("") : renderEmpty("当前没有提交附件。")}</div>
+          </section>
+        ` : approval.comment ? `<section class="panel"><div class="comment-card"><p>${escapeHtml(approval.comment)}</p></div></section>` : ""}
         <div class="button-row">
           ${isApprovable && approveAction ? `<button class="button-primary" type="button" data-action="${approveAction}" data-approval-id="${approval.id}">通过</button>` : ""}
-          ${isApprovable ? `<button class="button-danger" type="button" data-action="reject-approval" data-approval-id="${approval.id}">拒绝</button>` : ""}
+          ${isApprovable && isCompletionApproval ? `<button class="button-danger" type="button" data-action="return-completion" data-approval-id="${approval.id}">驳回修改</button>` : ""}
+          ${isApprovable && !isCompletionApproval ? `<button class="button-danger" type="button" data-action="reject-approval" data-approval-id="${approval.id}">拒绝</button>` : ""}
           <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
         </div>
       </div>
@@ -523,7 +544,10 @@ function resolveApprovalTarget(approval) {
   if (["join", "completion", "settlement"].includes(approval.type)) {
     const task = getTaskById(approval.targetId);
     const submitter = getMemberById(approval.submitterId);
-    return { title: task ? task.title : "未知任务", subtitle: `${submitter?.name || "未知成员"} 提交 · ${task?.department || "未指定部门"} / ${task?.robotGroup || "通用"}` };
+    return {
+      title: task ? task.title : "未知任务",
+      subtitle: `${submitter?.name || "未知成员"} 提交 · ${joinOr(task?.departments || task?.department, "未指定部门")} / ${joinOr(task?.robotGroups || task?.robotGroup, "通用")}`,
+    };
   }
   if (["compensation", "promotion", "status_change"].includes(approval.type)) {
     const member = getMemberById(approval.targetId);
