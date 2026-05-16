@@ -1,9 +1,9 @@
-import { state, API_KEY_STORAGE_KEY, SESSION_KEY } from "../core/state.js";
+import { state } from "../core/state.js";
 import { uid } from "../core/security.js";
 import { parseList } from "../core/utils.js";
 import { addRecord, removeWhere } from "../core/data-access.js";
 import { ensureDatabaseReady, ensureSharedDataSync, saveDatabase } from "../core/database.js";
-import { saveSession } from "../core/session.js";
+import { clearApiKey, clearSession, saveSession, storeApiKey } from "../core/session.js";
 import { clearModalStack } from "../core/modal.js";
 import { getRoleForIdentity, ensureVisibleRoute } from "./permissions.js";
 import { getCurrentUser, getMemberById, getApprovalById } from "./query.js";
@@ -30,25 +30,21 @@ export async function handleLogin(form) {
       body: JSON.stringify({ email, password }),
     });
   } catch (error) {
-    sessionStorage.removeItem(API_KEY_STORAGE_KEY);
+    clearApiKey();
     state.authFeedback = error instanceof Error && error.message ? error.message : "登录失败，请稍后重试。";
     renderApp();
     return;
   }
 
-  if (authResult?.apiKey) {
-    sessionStorage.setItem(API_KEY_STORAGE_KEY, authResult.apiKey);
-  } else {
-    sessionStorage.removeItem(API_KEY_STORAGE_KEY);
-  }
-
   state.currentUserId = authResult.userId;
   state.authFeedback = "";
+  storeApiKey(authResult?.apiKey || "", state.rememberMe);
   await ensureDatabaseReady();
 
   const user = getCurrentUser();
   if (!user) {
     state.currentUserId = null;
+    clearSession();
     state.authFeedback = "登录后未找到账号数据，请刷新页面后重试。";
     renderApp();
     return;
@@ -56,11 +52,10 @@ export async function handleLogin(form) {
 
   user.lastLoginAt = new Date().toISOString();
   await saveDatabase();
-  if (state.rememberMe) {
-    saveSession(state.currentUserId);
-  } else {
-    localStorage.removeItem(SESSION_KEY);
-  }
+  saveSession(state.currentUserId, {
+    rememberMe: state.rememberMe,
+    apiKey: authResult?.apiKey || "",
+  });
   ensureSharedDataSync();
   ensureVisibleRoute();
   renderApp();
@@ -114,7 +109,7 @@ if (!username || !name || !email || !phone || !department || !password) {
 
   if (!(await saveDatabase())) return;
   state.currentUserId = userId;
-  saveSession(state.currentUserId);
+  clearSession();
   ensureSharedDataSync();
   state.authFeedback = "";
   renderApp();
@@ -177,7 +172,7 @@ export async function cancelPendingRegistration() {
   clearModalStack();
   state.authMode = "login";
   state.authFeedback = "";
-  saveSession(state.currentUserId);
+  clearSession();
   renderApp();
 }
 

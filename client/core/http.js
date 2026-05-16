@@ -1,15 +1,12 @@
-import { DATABASE_API_URL, API_KEY_STORAGE_KEY } from "./state.js";
+import { DATABASE_API_URL } from "./state.js";
 import { AppError } from "./error-handler.js";
-
-function _getApiKey() {
-  return sessionStorage.getItem(API_KEY_STORAGE_KEY) || "";
-}
+import { loadApiKey } from "./session.js";
 
 export async function requestJson(url, options = {}) {
   const headers = { ...(options.headers || {}) };
   const method = (options.method || "GET").toUpperCase();
   if (!headers["X-API-Key"]) {
-    const apiKey = _getApiKey();
+    const apiKey = loadApiKey();
     if (apiKey) {
       headers["X-API-Key"] = apiKey;
     }

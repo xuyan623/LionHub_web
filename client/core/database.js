@@ -1,14 +1,21 @@
 import { dictionaries, LEGACY_STORAGE_KEY, SHARED_SYNC_INTERVAL_MS, state, setSharedSyncTimer } from "./state.js";
 import { requestJson, fetchDatabaseSnapshot, writeDatabaseSnapshot } from "./http.js";
 import { renderApp, pushFlash } from "./services.js";
-import { loadSession } from "./session.js";
+import { clearSession, loadApiKey, loadSession } from "./session.js";
 import { initRouter, navigateTo } from "./router.js";
 
 let hydrationPromise = null;
 let sharedSyncTimer = null;
 
 export function initialize() {
-  state.currentUserId = loadSession();
+  const rememberedUserId = loadSession();
+  if (rememberedUserId && !loadApiKey()) {
+    clearSession();
+    state.currentUserId = null;
+    state.authFeedback = "登录状态已过期，请重新登录。";
+  } else {
+    state.currentUserId = rememberedUserId;
+  }
   state.route = _readHashRoute() || "dashboard";
   state.initError = "";
   state.databaseReady = false;
@@ -252,6 +259,15 @@ function shouldPauseSharedSync() {
 async function recoverFromPersistenceFailure(error) {
   console.error("Failed to persist shared database:", error);
   const synchronized = await synchronizeDatabaseFromServer();
+  if (error.status === 401) {
+    state.currentUserId = null;
+    state.databaseReady = false;
+    clearSession();
+    state.authFeedback = "登录状态已失效，请重新登录后再继续操作。";
+    renderApp();
+    pushFlash("登录凭据已失效，当前已退出登录。", "info");
+    return;
+  }
   if (error.status === 409) {
     pushFlash(
       synchronized
