@@ -132,7 +132,7 @@ export async function handleProgressForm(form) {
 
   if (progressPercent === 100 && previousPercent < 100) {
     pushFlash("进度已达 100%，请填写成果说明并提交审核。", "info");
-    pushModal({ type: "task-completion", taskId: task.id, pendingFiles: [] });
+    pushModal({ type: "task-completion", taskId: task.id, pendingFiles: [], initialSummary: "" });
   } else {
     pushFlash("进度已更新。", "info");
   }
@@ -303,9 +303,28 @@ export function getSubmissionAttachments(task) {
   return (task.attachments || []).filter(isSubmissionAttachment);
 }
 
+function getCommentTimestamp(comment) {
+  const timestamp = Date.parse(comment?.createdAt || "");
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+export function getLatestSubmissionComment(task) {
+  const submissionComments = (task.comments || []).filter((comment) => comment.title === "成果提交");
+  if (!submissionComments.length) {
+    return null;
+  }
+  return submissionComments.reduce((latestComment, currentComment) => {
+    if (!latestComment) {
+      return currentComment;
+    }
+    return getCommentTimestamp(currentComment) > getCommentTimestamp(latestComment)
+      ? currentComment
+      : latestComment;
+  }, null);
+}
+
 export function getLatestSubmissionSummary(task) {
-  const submissionComment = [...(task.comments || [])].reverse().find((comment) => comment.title === "成果提交");
-  return submissionComment?.content || "";
+  return getLatestSubmissionComment(task)?.content || "";
 }
 
 function replaceSubmissionAttachments(task, attachments) {

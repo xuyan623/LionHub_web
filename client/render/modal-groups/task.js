@@ -3,7 +3,7 @@ import { escapeAttribute, escapeHtml } from "../../core/security.js";
 import { addDays, formatDateTime, toDateTimeLocalValue } from "../../core/format.js";
 import { getDraftKey, loadDraft } from "../../core/drafts.js";
 import { getActiveParticipantCount, getCurrentMember, getMemberById, getTaskById, getTaskParticipantRecords } from "../../domain/query.js";
-import { getLatestSubmissionSummary, getSubmissionAttachments } from "../../domain/task.js";
+import { getSubmissionAttachments } from "../../domain/task.js";
 import { canDeleteAllGeneratedData, canDeleteTask, canDeleteTaskGeneratedData, canEditTask, canMemberBeAddedToTask } from "../../domain/permissions.js";
 import { renderAttachmentCard, renderEmpty, renderMemberDetail, renderMultiSelectOptions, renderPointPill, renderSelectOptions, renderTaskCard, renderTimelineCard } from "../components.js";
 import { renderTaskDetail } from "../task-detail.js";
@@ -33,9 +33,9 @@ export function render(modalType) {
 export function renderTaskCompletionModal() {
   const task = getTaskById(state.modal.taskId);
   if (!task) return "";
-  const latestSubmissionSummary = getLatestSubmissionSummary(task);
   const existingSubmissionAttachments = getSubmissionAttachments(task);
   const stagedProgressFiles = Array.isArray(state.modal.pendingFiles) ? state.modal.pendingFiles : [];
+  const initialSummary = typeof state.modal.initialSummary === "string" ? state.modal.initialSummary : "";
   return `
     <div class="modal">
       <div class="modal-card modal-card-completion glass-card">
@@ -44,8 +44,7 @@ export function renderTaskCompletionModal() {
           <button class="button-ghost" type="button" data-action="close-overlay">取消</button>
         </div>
         <form class="auth-form" data-form="task-submit" data-task-id="${task.id}">
-          <input type="hidden" name="progressNote" value="${escapeAttribute(state.modal.progressNote || "")}">
-          <label class="field-group"><span class="field-label">成果说明</span><textarea class="field-textarea" name="summary" placeholder="描述完成内容、验收方式与产出结论" required>${escapeHtml(latestSubmissionSummary)}</textarea></label>
+          <label class="field-group"><span class="field-label">成果说明</span><textarea class="field-textarea" name="summary" placeholder="描述完成内容、验收方式与产出结论" required>${escapeHtml(initialSummary)}</textarea></label>
           <label class="field-group"><span class="field-label">上传附件</span><input class="field-input field-file-input" type="file" name="attachments" multiple onchange="this.nextElementSibling.textContent = this.files.length > 5 ? '单次最多上传 5 个文件。' : ''"><span class="helper-text file-count-warn" style="color:var(--danger)"></span></label>
           <div class="helper-text">附件会上传到当前任务的共享附件区。可一次选择多个文件；如果本次不重新选择，将保留当前已上传的附件。</div>
           ${stagedProgressFiles.length ? `<div class="helper-text">当前有 ${stagedProgressFiles.length} 个从"更新进度"带入的附件，会在提交审核时一并上传。</div>` : ""}
