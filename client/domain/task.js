@@ -175,8 +175,9 @@ export async function handleTaskAttachmentForm(form) {
   const selectedFiles = getSelectedUploadFiles(formData.getAll("attachments"));
   if (!selectedFiles.length) { pushFlash("请选择要上传的附件。", "info"); return; }
 
+  let uploadedAttachments = [];
   try {
-    const uploadedAttachments = await uploadLocalAttachments(task.id, selectedFiles, "task_attachment");
+    uploadedAttachments = await uploadLocalAttachments(task.id, selectedFiles, "task_attachment");
     for (const attachment of uploadedAttachments) {
       task.attachments.push(attachment);
     }
@@ -185,7 +186,10 @@ export async function handleTaskAttachmentForm(form) {
     return;
   }
 
-  if (!(await saveDatabase())) return;
+  if (!(await saveDatabase())) {
+    await cleanupUploadedAttachmentsAfterFailedSave(uploadedAttachments);
+    return;
+  }
   popModal();
   pushFlash("附件已上传。", "info");
 }
@@ -268,7 +272,10 @@ export async function handleSubmissionForm(form) {
   if (owner && owner.userId && owner.userId !== submitter.userId) {
     createNotification(owner.userId, `${submitter.name} 提交了《${task.title}》的成果，等待审核`, { sourceId: submissionComment.id, sourceType: "comment", taskId: task.id, memberId: submitter.id, type: "task_review" });
   }
-  if (!(await saveDatabase())) return;
+  if (!(await saveDatabase())) {
+    await cleanupUploadedAttachmentsAfterFailedSave(uploadedAttachments);
+    return;
+  }
   clearModalStack();
   pushFlash("成果已提交，等待审核。", "info");
 }
@@ -309,6 +316,13 @@ export function appendTaskAttachments(task, attachments) {
   for (const attachment of attachments) {
     task.attachments.push(attachment);
   }
+}
+
+async function cleanupUploadedAttachmentsAfterFailedSave(attachments) {
+  if (!attachments.length) {
+    return;
+  }
+  await deleteLocalAttachments(attachments);
 }
 
 export async function deleteTaskComment(taskId, commentId) {
