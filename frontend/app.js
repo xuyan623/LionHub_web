@@ -41,6 +41,22 @@ function openModal(type, payload = {}, mode = "replace") {
   void loadModalChunk(type);
 }
 
+let notificationPersistPromise = null;
+
+function persistNotificationReadState() {
+  if (notificationPersistPromise) {
+    return notificationPersistPromise;
+  }
+  notificationPersistPromise = saveDatabase()
+    .catch((error) => {
+      console.error("Failed to persist notification read state:", error);
+    })
+    .finally(() => {
+      notificationPersistPromise = null;
+    });
+  return notificationPersistPromise;
+}
+
 document.addEventListener("click", async (event) => {
   const actionTarget = event.target.closest("[data-action]");
   if (!actionTarget) return;
@@ -92,6 +108,19 @@ document.addEventListener("click", async (event) => {
     state.mobileNavOpen = false;
     clearSession();
     clearModalStack();
+    return;
+  }
+
+  if (action === "toggle-notif-panel") {
+    const notifications = await moduleLoaders.notifications();
+    state.notifPanelOpen = !state.notifPanelOpen;
+    if (!state.notifPanelOpen) {
+      notifications.markAllNotificationsRead();
+      renderApp();
+      void persistNotificationReadState();
+      return;
+    }
+    renderApp();
     return;
   }
 
@@ -325,9 +354,16 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "open-approval-reject") {
+    openModal("approval-reject", {
+      approvalId: actionTarget.dataset.approvalId,
+      decisionType: actionTarget.dataset.decisionType || "reject",
+    });
+    return;
+  }
+
   if (action === "reject-approval") {
-    const approval = await moduleLoaders.approval();
-    await approval.rejectApproval(actionTarget.dataset.approvalId, "申请未通过");
+    openModal("approval-reject", { approvalId: actionTarget.dataset.approvalId, decisionType: "reject" });
     return;
   }
 
@@ -356,8 +392,7 @@ document.addEventListener("click", async (event) => {
   }
 
   if (action === "reject-registration") {
-    const approval = await moduleLoaders.approval();
-    await approval.rejectRegistration(actionTarget.dataset.approvalId);
+    openModal("approval-reject", { approvalId: actionTarget.dataset.approvalId, decisionType: "registration" });
     return;
   }
 
@@ -380,8 +415,7 @@ document.addEventListener("click", async (event) => {
   }
 
   if (action === "reject-status-change") {
-    const approval = await moduleLoaders.approval();
-    await approval.rejectApproval(actionTarget.dataset.approvalId, "变岗申请未通过");
+    openModal("approval-reject", { approvalId: actionTarget.dataset.approvalId, decisionType: "reject" });
     return;
   }
 
@@ -442,14 +476,12 @@ document.addEventListener("click", async (event) => {
   }
 
   if (action === "return-completion") {
-    const approval = await moduleLoaders.approval();
-    await approval.returnCompletion(actionTarget.dataset.approvalId);
+    openModal("approval-reject", { approvalId: actionTarget.dataset.approvalId, decisionType: "return" });
     return;
   }
 
   if (action === "reject-promotion") {
-    const approval = await moduleLoaders.approval();
-    await approval.rejectApproval(actionTarget.dataset.approvalId, "转正申请未通过");
+    openModal("approval-reject", { approvalId: actionTarget.dataset.approvalId, decisionType: "reject" });
     return;
   }
 
@@ -542,17 +574,6 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
-  if (action === "toggle-notif-panel") {
-    const notifications = await moduleLoaders.notifications();
-    if (state.notifPanelOpen) {
-      state.notifPanelOpen = false;
-      notifications.markAllNotificationsRead();
-      await saveDatabase();
-    } else {
-      state.notifPanelOpen = true;
-    }
-    renderApp();
-  }
 });
 
 document.addEventListener("submit", async (event) => {
@@ -631,6 +652,11 @@ document.addEventListener("submit", async (event) => {
         await approval.handleRegistrationReview(form);
         break;
       }
+      case "approval-reject": {
+        const approval = await moduleLoaders.approval();
+        await approval.handleApprovalRejectionForm(form);
+        break;
+      }
       case "task-progress": {
         const task = await moduleLoaders.task();
         await task.handleProgressForm(form);
@@ -697,11 +723,6 @@ document.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLElement)) return;
   if (isFormField(target)) clearFieldValidationState(target);
-  if (target.dataset.globalSearch !== undefined) {
-    state.globalSearch = target.value;
-    renderApp();
-    return;
-  }
   if (target.dataset.participantSearch !== undefined) {
     const taskId = target.dataset.participantSearch;
     const query = target.value.toLowerCase();
@@ -811,6 +832,7 @@ document.addEventListener("keydown", async (event) => {
       const notifications = await moduleLoaders.notifications();
       notifications.markAllNotificationsRead();
       renderApp();
+      void persistNotificationReadState();
       return;
     }
     if (state.modal) {

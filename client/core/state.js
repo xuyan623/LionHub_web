@@ -221,7 +221,6 @@ export const state = {
   modal: null,
   modalStack: [],
   mobileNavOpen: false,
-  globalSearch: "",
   settingsFiles: null,
   settingsFileLoading: false,
   attachmentsIndex: null,

@@ -22,6 +22,7 @@ const modalGroupLoaders = {
 
 const modalGroupsByType = {
   "approval-action": "approval",
+  "approval-reject": "approval",
   "password-change": "approval",
   "promotion-detail": "approval",
   "registration-edit": "approval",

@@ -81,19 +81,22 @@ export async function rejectApproval(approvalId, comment) {
   approval.approverId = getCurrentMember().id;
   approval.reviewedAt = new Date().toISOString();
   approval.comment = comment;
-  // Notify for join rejection
-  if (approval.type === "join") {
-    const member = getMemberById(approval.submitterId);
-    const task = getTaskById(approval.targetId);
-    if (member?.userId && task) {
-      createNotification(member.userId, `你加入《${task.title}》的申请被拒绝：${comment}`, { sourceId: approval.id, sourceType: "approval", taskId: task.id, memberId: member.id, type: "task_review" });
-    }
+  const member = getMemberById(approval.submitterId) || getMemberById(approval.targetId);
+  const task = getTaskById(approval.targetId);
+  if (approval.type === "join" && member?.userId && task) {
+    createNotification(member.userId, `你加入《${task.title}》的申请被拒绝：${comment}`, { sourceId: approval.id, sourceType: "approval", taskId: task.id, memberId: member.id, type: "task_review" });
+  }
+  if (approval.type === "promotion" && member?.userId) {
+    createNotification(member.userId, `你的转正申请未通过：${comment}`, { sourceId: approval.id, sourceType: "approval", memberId: member.id, type: "task_review" });
+  }
+  if (approval.type === "status_change" && member?.userId) {
+    createNotification(member.userId, `你的变岗申请未通过：${comment}`, { sourceId: approval.id, sourceType: "approval", memberId: member.id, type: "task_review" });
   }
   if (!(await saveDatabase())) return;
   pushFlash("审批已拒绝。", "info");
 }
 
-export async function rejectRegistration(approvalId) {
+export async function rejectRegistration(approvalId, comment = "注册审核未通过") {
   const approval = getApprovalById(approvalId);
   if (!approval) return;
   const member = getMemberById(approval.targetId);
@@ -101,11 +104,11 @@ export async function rejectRegistration(approvalId) {
   approval.status = "rejected";
   approval.approverId = getCurrentMember().id;
   approval.reviewedAt = new Date().toISOString();
-  approval.comment = "注册审核未通过";
+  approval.comment = comment;
   if (user) user.status = "rejected";
   // Notify the rejected applicant
   if (user) {
-    createNotification(user.id, "你的注册申请未通过审核，请联系管理员了解详情", { sourceId: approval.id, sourceType: "approval", memberId: member?.id, type: "task_review" });
+    createNotification(user.id, `你的注册申请未通过审核：${comment}`, { sourceId: approval.id, sourceType: "approval", memberId: member?.id, type: "task_review" });
   }
   if (!(await saveDatabase())) return;
   clearModalStack();
@@ -156,7 +159,7 @@ export async function approvePromotionRequest(approvalId) {
   pushFlash(`已通过 ${member.name} 的转正申请。`, "info");
 }
 
-export async function returnCompletion(approvalId) {
+export async function returnCompletion(approvalId, comment = "请补充成果后重新提交") {
   const approval = getApprovalById(approvalId);
   if (!approval || !canReview()) return;
   const task = getTaskById(approval.targetId);
@@ -168,11 +171,11 @@ export async function returnCompletion(approvalId) {
   approval.status = "returned";
   approval.approverId = getCurrentMember().id;
   approval.reviewedAt = new Date().toISOString();
-  approval.comment = "请补充成果后重新提交";
+  approval.comment = comment;
   if (task) {
     const participantUserIds = getParticipantUserIds(task.id);
     participantUserIds.forEach((userId) => {
-      createNotification(userId, `任务《${task.title}》被退回，请补充成果`, { sourceId: approval.id, sourceType: "approval", taskId: task.id, type: "task_review" });
+      createNotification(userId, `任务《${task.title}》被退回：${comment}`, { sourceId: approval.id, sourceType: "approval", taskId: task.id, type: "task_review" });
     });
   }
   if (!(await saveDatabase())) return;
@@ -223,6 +226,30 @@ export async function handleRoleChangeRequestForm(form) {
   if (!(await saveDatabase())) { removeWhere("approvals", (item) => item.id === approvalId); return; }
   clearModalStack();
   pushFlash("变岗申请已提交，等待审核。", "info");
+}
+
+export async function handleApprovalRejectionForm(form) {
+  const formData = new FormData(form);
+  const approvalId = String(formData.get("approvalId") || "").trim();
+  const decisionType = String(formData.get("decisionType") || "reject").trim();
+  const reason = String(formData.get("reason") || "").trim();
+  if (!approvalId) {
+    pushFlash("缺少审核记录，无法提交。", "info");
+    return;
+  }
+  if (!reason) {
+    pushFlash("请填写处理原因。", "info");
+    return;
+  }
+  if (decisionType === "registration") {
+    await rejectRegistration(approvalId, reason);
+    return;
+  }
+  if (decisionType === "return") {
+    await returnCompletion(approvalId, reason);
+    return;
+  }
+  await rejectApproval(approvalId, reason);
 }
 
 export async function deleteApprovalRecord(approvalId) {

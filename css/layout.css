@@ -654,6 +654,23 @@
   outline: none;
 }
 
+.topbar-context {
+  display: grid;
+  gap: 2px;
+}
+
+.topbar-context small {
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+}
+
+.topbar-context strong {
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;

@@ -3,12 +3,12 @@ export function render() {
 }
 
 import { state } from "../../core/state.js";
-import { getCurrentUserTaskRecords, getDashboardStats, getDepartmentContribution, getLeaderboard, getMarketTasks, getMemberLoads } from "../../domain/query.js";
+import { getCurrentUserTaskRecords, getDashboardFeaturedTasks, getDashboardStats, getDepartmentContribution, getLeaderboard, getMemberLoads } from "../../domain/query.js";
 import { renderChartRow, renderEmpty, renderLoadRow, renderMetricCard, renderPointPill, renderProjectCard, renderRankingRow, renderTaskCard } from "../components.js";
 
 export function renderDashboardPage() {
   const stats = getDashboardStats();
-  const featuredTasks = getMarketTasks().slice(0, 4);
+  const featuredTasks = getDashboardFeaturedTasks().slice(0, 4);
   const myTasks = getCurrentUserTaskRecords().active.slice(0, 4);
   const loads = getMemberLoads().slice(0, 6);
   const ranking = getLeaderboard("composite", "total").slice(0, 5);
@@ -32,7 +32,7 @@ export function renderDashboardPage() {
           <div class="task-stack">${myTasks.length ? myTasks.map(({ task }) => renderTaskCard(task, { compact: true })).join("") : renderEmpty("当前没有进行中的个人任务。")}</div>
         </section>
         <section class="panel">
-          <div class="section-header"><div><h3>任务市场精选</h3><p>面向当前成员画像的最新公开任务。</p></div><button class="button-ghost" type="button" data-action="navigate" data-route="market">进入市场</button></div>
+          <div class="section-header"><div><h3>任务市场精选</h3><p>只展示当前仍需跟进的公开任务，已完成任务不会继续占用精选位。</p></div><button class="button-ghost" type="button" data-action="navigate" data-route="market">进入市场</button></div>
           <div class="task-stack">${featuredTasks.map((task) => renderTaskCard(task, { showAction: true, compact: true })).join("")}</div>
         </section>
         <section class="panel">

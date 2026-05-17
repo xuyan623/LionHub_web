@@ -11,6 +11,8 @@ export function render(modalType) {
   switch (modalType) {
     case "approval-action":
       return renderApprovalActionModal();
+    case "approval-reject":
+      return renderApprovalRejectModal();
     case "password-change":
       return renderPasswordChangeModal();
     case "promotion-detail":
@@ -61,6 +63,38 @@ export function renderSensitiveActionModal() {
             <div class="helper-text">为避免误操作，需要再次确认当前登录账号。</div>
             <div class="button-row">
               <button class="button-danger" type="submit">${escapeHtml(submitLabel)}</button>
+              <button class="button-ghost" type="button" data-action="close-overlay">取消</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+export function renderApprovalRejectModal() {
+  const approval = getApprovalById(state.modal.approvalId);
+  if (!approval) return "";
+  const decisionType = state.modal.decisionType || "reject";
+  const config = getApprovalRejectConfig(decisionType, approval);
+  return `
+    <div class="modal">
+      <div class="modal-card modal-card-completion glass-card">
+        <div class="section-header">
+          <div><h3>${escapeHtml(config.title)}</h3><p>${escapeHtml(config.description)}</p></div>
+          <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
+        </div>
+        <form class="auth-form" data-form="approval-reject">
+          <input type="hidden" name="approvalId" value="${escapeAttribute(approval.id)}">
+          <input type="hidden" name="decisionType" value="${escapeAttribute(decisionType)}">
+          <label class="field-group">
+            <span class="field-label">${escapeHtml(config.label)}</span>
+            <textarea class="field-textarea" name="reason" required placeholder="${escapeAttribute(config.placeholder)}"></textarea>
+          </label>
+          <div class="modal-actions-sticky">
+            <div class="helper-text">${escapeHtml(config.helperText)}</div>
+            <div class="button-row">
+              <button class="button-danger" type="submit" ${state.formLoading === "approval-reject" ? "disabled" : ""}>${escapeHtml(config.submitLabel)}</button>
               <button class="button-ghost" type="button" data-action="close-overlay">取消</button>
             </div>
           </div>
@@ -166,7 +200,7 @@ export function renderPromotionDetailModal() {
           <div class="helper-text">审核通过后，该成员会进入新的成员身份。</div>
           <div class="button-row">
             ${approval.status === "pending" && canReview() ? `<button class="button-primary" type="button" data-action="approve-promotion" data-approval-id="${approval.id}">通过转正</button>` : ""}
-            ${approval.status === "pending" && canReview() ? `<button class="button-danger" type="button" data-action="reject-promotion" data-approval-id="${approval.id}">拒绝申请</button>` : ""}
+            ${approval.status === "pending" && canReview() ? `<button class="button-danger" type="button" data-action="open-approval-reject" data-approval-id="${approval.id}" data-decision-type="reject">拒绝申请</button>` : ""}
             ${canDeleteApprovalRecord(approval) ? `<button class="button-danger" type="button" data-action="delete-approval" data-approval-id="${approval.id}">删除记录</button>` : ""}
             <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
           </div>
@@ -217,8 +251,8 @@ export function renderApprovalActionModal() {
           <div class="helper-text">${isCompletionApproval ? "完成审核通过后会直接进入结算流程。" : "处理结果会即时同步到对应成员或任务记录。"}</div>
           <div class="button-row">
             ${isApprovable && approveAction ? `<button class="button-primary" type="button" data-action="${approveAction}" data-approval-id="${approval.id}">通过</button>` : ""}
-            ${isApprovable && isCompletionApproval ? `<button class="button-danger" type="button" data-action="return-completion" data-approval-id="${approval.id}">驳回修改</button>` : ""}
-            ${isApprovable && !isCompletionApproval ? `<button class="button-danger" type="button" data-action="reject-approval" data-approval-id="${approval.id}">拒绝</button>` : ""}
+            ${isApprovable && isCompletionApproval ? `<button class="button-danger" type="button" data-action="open-approval-reject" data-approval-id="${approval.id}" data-decision-type="return">驳回修改</button>` : ""}
+            ${isApprovable && !isCompletionApproval ? `<button class="button-danger" type="button" data-action="open-approval-reject" data-approval-id="${approval.id}" data-decision-type="reject">拒绝</button>` : ""}
             <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
           </div>
         </div>
@@ -260,7 +294,7 @@ export function renderRegistrationReviewModal() {
             <div class="helper-text">审核通过后，成员即可带着分配好的身份和方向进入工作台。</div>
             <div class="button-row">
               <button class="button-primary" type="submit" ${state.formLoading === "registration-review" ? "disabled" : ""}>审核通过</button>
-              <button class="button-danger" type="button" data-action="reject-registration" data-approval-id="${approval.id}">拒绝申请</button>
+              <button class="button-danger" type="button" data-action="open-approval-reject" data-approval-id="${approval.id}" data-decision-type="registration">拒绝申请</button>
             </div>
           </div>
         </form>
@@ -315,6 +349,38 @@ function resolveApprovalTarget(approval) {
     return { title: member ? member.name : "未知成员", subtitle: approval.comment };
   }
   return { title: "未知记录", subtitle: approval.comment || "" };
+}
+
+function getApprovalRejectConfig(decisionType, approval) {
+  if (decisionType === "registration") {
+    return {
+      title: "拒绝注册申请",
+      description: "请写明拒绝原因，系统会把这段说明同步给申请人。",
+      label: "拒绝原因",
+      placeholder: "例如：资料不完整、方向与当前招募不匹配、需要补充项目经历等",
+      helperText: "原因会写入审核记录，并随通知一起发送给申请人。",
+      submitLabel: "确认拒绝",
+    };
+  }
+  if (decisionType === "return") {
+    return {
+      title: "驳回成果并要求修改",
+      description: "请明确说明需要补充或修改的内容，便于成员按要求重新提交。",
+      label: "驳回说明",
+      placeholder: "例如：缺少验收截图、成果说明不完整、附件版本不对等",
+      helperText: "说明会保留在审核记录里，并通知相关成员重新补充。",
+      submitLabel: "确认驳回",
+    };
+  }
+  const target = resolveApprovalTarget(approval);
+  return {
+    title: "拒绝当前申请",
+    description: `请为“${target.title}”填写拒绝原因，避免成员只看到结果看不到依据。`,
+    label: "拒绝原因",
+    placeholder: "例如：任务范围不匹配、当前能力未达到要求、说明材料不足等",
+    helperText: "原因会保留在审核记录中，并同步给对应成员。",
+    submitLabel: "确认拒绝",
+  };
 }
 
 function renderSettlementPreviewPanel(task, settlementPreview) {

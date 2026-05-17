@@ -342,7 +342,7 @@ export async function deleteTaskComment(taskId, commentId) {
 export async function deleteTaskAttachment(taskId, attachmentId) {
   const task = getTaskById(taskId);
   const attachment = task?.attachments?.find((item) => item.id === attachmentId);
-  if (!task || !attachment || !canDeleteTaskGeneratedData(task)) {
+  if (!task || !attachment || !canDeleteTaskGeneratedData(task, attachment.uploadedBy || "")) {
     pushFlash("当前没有权限删除该附件。", "info"); return;
   }
   if (!window.confirm(`确认删除附件《${attachment.name}》？删除后不可恢复。`)) return;
@@ -410,19 +410,20 @@ export async function joinTask(taskId) {
     pushFlash("已重新加入任务。", "info"); return;
   }
 
-  const needsApproval = task.approvalRequired || (state.database.settings.hardTaskNeedsApproval && ["hard", "core"].includes(task.difficulty));
+  const isMiddleJoinTask = task.status !== "todo";
+  const needsApproval = isMiddleJoinTask || task.approvalRequired || (state.database.settings.hardTaskNeedsApproval && ["hard", "core"].includes(task.difficulty));
   if (needsApproval) {
     const pending = state.database.approvals.find((approval) => approval.type === "join" && approval.status === "pending" && approval.targetId === task.id && approval.submitterId === member.id);
-    if (pending) { pushFlash("该高难任务已存在待审批申请。", "info"); return; }
-    const approval = { id: uid("approval"), type: "join", targetId: task.id, submitterId: member.id, approverId: null, status: "pending", comment: "申请加入高难任务", createdAt: new Date().toISOString(), reviewedAt: null };
+    if (pending) { pushFlash(isMiddleJoinTask ? "当前任务已存在你的中途加入申请。": "该任务已存在你的待审批加入申请。", "info"); return; }
+    const approval = { id: uid("approval"), type: "join", targetId: task.id, submitterId: member.id, approverId: null, status: "pending", comment: isMiddleJoinTask ? "申请中途加入任务" : "申请加入高难任务", createdAt: new Date().toISOString(), reviewedAt: null };
     addRecord("approvals", approval);
     // Notify reviewers of new join request
     const reviewerUserIds = getReviewerUserIds();
     reviewerUserIds.forEach((reviewerId) => {
-      createNotification(reviewerId, `${member.name} 申请加入任务《${task.title}》`, { sourceId: approval.id, sourceType: "approval", taskId: task.id, memberId: member.id, type: "info" });
+      createNotification(reviewerId, `${member.name} 申请${isMiddleJoinTask ? "中途加入" : "加入"}任务《${task.title}》`, { sourceId: approval.id, sourceType: "approval", taskId: task.id, memberId: member.id, type: "info" });
     });
     if (!(await saveDatabase())) return;
-    pushFlash("已提交加入申请，等待组长或管理员审批。", "info"); return;
+    pushFlash(isMiddleJoinTask ? "已提交中途加入申请，等待组长或管理员审批。" : "已提交加入申请，等待组长或管理员审批。", "info"); return;
   }
 
   const newParticipant = { id: uid("participant"), taskId: task.id, memberId: member.id, role: "协作者", joinType: task.status === "todo" ? "initial" : "middle", status: "involved", joinedAt: new Date().toISOString(), exitedAt: null, contributionRatio: 1 };

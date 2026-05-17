@@ -354,11 +354,12 @@ export function renderAttachmentCard(attachment, taskId = "") {
   const attachmentName = attachment.name || "附件资料";
   const attachmentUrl = attachment.url ? `${attachment.url}${attachment.url.includes("?") ? "&" : "?"}downloadName=${encodeURIComponent(attachmentName)}` : "#";
   const sourceLabel = resolveAttachmentSourceLabel(attachment);
+  const canDelete = taskId && canDeleteTaskGeneratedData(getTaskById(taskId), attachment.uploadedBy || "");
   return `
     <div class="comment-card">
       <a class="attachment-link" href="${escapeAttribute(attachmentUrl)}" target="_blank" rel="noreferrer" download="${escapeAttribute(attachmentName)}"><strong>${escapeHtml(attachmentName)}</strong></a>
       ${sourceLabel ? `<div class="helper-text">${escapeHtml(sourceLabel)}</div>` : ""}
-      ${taskId && canDeleteTaskGeneratedData(getTaskById(taskId)) ? `<div class="button-row"><button class="button-danger" type="button" data-action="delete-attachment" data-task-id="${taskId}" data-attachment-id="${attachment.id}">删除附件</button></div>` : ""}
+      ${canDelete ? `<div class="button-row"><button class="button-danger" type="button" data-action="delete-attachment" data-task-id="${taskId}" data-attachment-id="${attachment.id}">删除附件</button></div>` : ""}
     </div>
   `;
 }

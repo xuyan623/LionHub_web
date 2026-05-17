@@ -1,10 +1,10 @@
 import { appRoot, dictionaries, state } from "../core/state.js";
-import { escapeAttribute, escapeHtml } from "../core/security.js";
+import { escapeHtml } from "../core/security.js";
 import { formatDateTime } from "../core/format.js";
 import { getInitials } from "../core/utils.js";
 import { getLoadedModalChunk, getLoadedRouteChunk, loadModalChunk, loadRouteChunk, scheduleWorkspacePrefetch } from "../core/runtime-loader.js";
 import { saveSession } from "../core/session.js";
-import { getCurrentMember, getCurrentUser, getSearchPlaceholder, getMemberById } from "../domain/query.js";
+import { getCurrentMember, getCurrentUser, getMemberById } from "../domain/query.js";
 import { canCreateTask, getVisibleRoutes } from "../domain/permissions.js";
 import { getPendingApprovalCount } from "./components.js";
 import { getNotificationsForCurrentUser, getUnreadNotificationCount } from "../domain/notifications.js";
@@ -35,7 +35,8 @@ export function renderWorkspaceRoot(root = appRoot) {
 
 function renderWorkspace() {
   const member = getCurrentMember();
-  const navItems = getVisibleRoutes();
+  const navItems = getVisibleRoutes().filter((route) => route.id !== "profile");
+  const currentRoute = getVisibleRoutes().find((route) => route.id === state.route);
   const pendingCount = getPendingApprovalCount();
   return `
     <div class="workspace">
@@ -68,7 +69,10 @@ function renderWorkspace() {
         <div class="topbar">
           <div class="search-shell">
             <button class="button-ghost mobile-toggle" type="button" data-action="toggle-nav">菜单</button>
-            <input type="text" placeholder="${escapeAttribute(getSearchPlaceholder())}" value="${escapeAttribute(state.globalSearch)}" data-global-search>
+            <div class="topbar-context">
+              <small>当前页面</small>
+              <strong>${escapeHtml(currentRoute?.label || "工作台")}</strong>
+            </div>
           </div>
           <div class="topbar-actions">
             <span class="topbar-chip">待审核 ${pendingCount}</span>

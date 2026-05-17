@@ -4,6 +4,7 @@ export function render() {
 
 import { dictionaries } from "../../core/state.js";
 import { getCurrentMember, getCurrentUserTaskRecords, getMemberPointSummary, getMemberTimeline } from "../../domain/query.js";
+import { canRequestRoleChange, getMemberPendingRoleChange } from "../../domain/permissions.js";
 import { renderEmpty, renderMetricCard, renderTaskCard, renderTimelineCard } from "../components.js";
 
 export function renderProfilePage() {
@@ -11,6 +12,8 @@ export function renderProfilePage() {
   const stats = getMemberPointSummary(member.id);
   const history = getMemberTimeline(member.id);
   const tasks = getCurrentUserTaskRecords();
+  const pendingRoleChange = getMemberPendingRoleChange(member.id);
+  const canOpenRoleChange = canRequestRoleChange(member);
   return `
     <section>
       <div class="page-header"><div><h2>个人中心</h2><p>查看个人档案、任务轨迹、积分构成、隐私记录与晋升路径。</p></div></div>
@@ -27,8 +30,10 @@ export function renderProfilePage() {
           </div>
           <div class="button-row">
             <button class="button-secondary" type="button" data-action="open-profile-content">修改个性内容</button>
+            ${pendingRoleChange ? `<button class="button-secondary" type="button" disabled>变岗审核中</button>` : canOpenRoleChange ? `<button class="button-secondary" type="button" data-action="open-role-change-request">申请变岗</button>` : ""}
             <button class="button-ghost" type="button" data-action="open-password-change">修改密码</button>
           </div>
+          ${pendingRoleChange ? `<div class="helper-text">当前已提交变岗申请，目标身份为 ${dictionaries.identities[pendingRoleChange.requestedIdentity] || "未指定"}，请等待审核结果。</div>` : ""}
           ${member.memberStatus === "retired" ? '<div class="helper-text">当前账号已退休，保留历史记录并可只读浏览，但不再参与任务、积分与排行。</div>' : ""}
         </section>
         <section class="panel">

@@ -1,4 +1,4 @@
-import { state, dictionaries, routes, FILES_PER_PAGE } from "../core/state.js";
+import { state, dictionaries } from "../core/state.js";
 import { escapeHtml } from "../core/security.js";
 import { parseList, clamp, roundPointFromSettings, toArray } from "../core/utils.js";
 import {
@@ -84,11 +84,6 @@ export function getLoadLevel(activeCount, dueSoon, overdue) {
 
 export function loadLevelOrder(level) {
   return { idle: 1, normal: 2, busy: 3, overload: 4 }[level] || 0;
-}
-
-export function getSearchPlaceholder() {
-  const current = routes.find((route) => route.id === state.route);
-  return current ? `搜索${current.label}中的任务、成员或标签` : "搜索";
 }
 
 export function getAttachmentsIndex() {
@@ -301,6 +296,18 @@ export function getDashboardStats() {
   };
 }
 
+function getTaskFeaturedTimestamp(task) {
+  return new Date(task.submittedAt || task.createdAt || task.dueAt || 0).getTime();
+}
+
+export function getDashboardFeaturedTasks() {
+  return getCachedDerivedValue("dashboardFeaturedTasks", () =>
+    state.database.tasks
+      .filter((task) => task.publicToMarket && task.status !== "completed")
+      .sort((left, right) => getTaskFeaturedTimestamp(right) - getTaskFeaturedTimestamp(left))
+  );
+}
+
 export function getMarketTasks() {
   return state.database.tasks
     .filter((task) => task.publicToMarket)
@@ -314,7 +321,7 @@ export function isUrgentMarketTask(task) {
 export function getFilteredMarketTasks() {
   return getMarketTasks().filter((task) => {
     const query = `${task.title} ${task.description} ${task.acceptanceCriteria || ""} ${task.recommendedFor} ${(task.tags || []).join(" ")}`.toLowerCase();
-    const filterQuery = `${state.marketFilters.query} ${state.globalSearch}`.trim().toLowerCase();
+    const filterQuery = state.marketFilters.query.trim().toLowerCase();
     const audienceQuery = state.marketFilters.audience.trim().toLowerCase();
     if (filterQuery && !query.includes(filterQuery)) {
       return false;
@@ -360,7 +367,7 @@ export function getFilteredMembers() {
       return false;
     }
     const query = `${member.name} ${member.bio} ${member.departments.join(" ")} ${member.skillTags.join(" ")}`.toLowerCase();
-    const mergedQuery = `${state.memberFilters.query} ${state.globalSearch}`.trim().toLowerCase();
+    const mergedQuery = state.memberFilters.query.trim().toLowerCase();
     if (mergedQuery && !query.includes(mergedQuery)) return false;
     if (state.memberFilters.department !== "all" && !member.departments.includes(state.memberFilters.department)) return false;
     if (state.memberFilters.robotGroup !== "all" && !member.robotGroups.includes(state.memberFilters.robotGroup)) return false;
@@ -480,5 +487,8 @@ export function getJoinActionLabel(task) {
   if (participant) return "";
   const pendingApproval = state.database.approvals.find((approval) => approval.type === "join" && approval.targetId === task.id && approval.submitterId === currentMember.id && approval.status === "pending");
   if (pendingApproval) return "审批中";
+  if (task.status !== "todo") {
+    return "申请加入";
+  }
   return task.approvalRequired || (state.database.settings.hardTaskNeedsApproval && ["hard", "core"].includes(task.difficulty)) ? "申请加入" : "直接领取";
 }
