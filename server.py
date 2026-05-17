@@ -213,7 +213,7 @@ def authenticate(payload: AuthPayload, request: Request) -> dict:
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后重试。")
     snapshot = store.load_snapshot()
     if not snapshot or not snapshot.get("database"):
-        raise HTTPException(status_code=401, detail="系统未初始化。")
+        raise HTTPException(status_code=401, detail="系统尚未准备完成，请稍后再试。")
     database = snapshot["database"]
     user = None
     for u in database.get("users", []):
@@ -270,7 +270,7 @@ def get_database_diff(from_version: int = 0, request: Request = None) -> dict:
 @app.put("/api/database")
 def save_database(payload: DatabasePayload, request: Request) -> dict:
     if not _validate_api_key(request):
-        raise HTTPException(status_code=401, detail="未授权：缺少有效的 API 密钥。")
+        raise HTTPException(status_code=401, detail="登录状态已失效，请重新登录后再试。")
     if not _check_rate_limit(_get_client_ip(request)):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后重试。")
     try:
@@ -294,12 +294,12 @@ def upload_files(
     files: list[UploadFile] = File(...),
 ) -> dict:
     if not _validate_api_key(request):
-        raise HTTPException(status_code=401, detail="未授权：缺少有效的 API 密钥。")
+        raise HTTPException(status_code=401, detail="登录状态已失效，请重新登录后再试。")
     if not _check_rate_limit(_get_client_ip(request)):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后重试。")
     task_id = taskId.strip()
     if not task_id:
-        raise HTTPException(status_code=400, detail="taskId 不能为空。")
+        raise HTTPException(status_code=400, detail="任务信息缺失，请返回任务页后重试。")
     if not files:
         raise HTTPException(status_code=400, detail="至少上传一个附件。")
     if len(files) > UPLOAD_MAX_FILE_COUNT:
@@ -364,7 +364,7 @@ def list_uploaded_files(request: Request) -> dict:
 @app.post("/api/uploads/delete")
 def delete_uploaded_files(payload: AttachmentDeletePayload, request: Request) -> dict:
     if not _validate_api_key(request):
-        raise HTTPException(status_code=401, detail="未授权：缺少有效的 API 密钥。")
+        raise HTTPException(status_code=401, detail="登录状态已失效，请重新登录后再试。")
     if not _check_rate_limit(_get_client_ip(request)):
         raise HTTPException(status_code=429, detail="请求过于频繁，请稍后重试。")
     deleted_paths: list[str] = []
@@ -400,7 +400,7 @@ def serve_uploaded_file(requested_path: str, downloadName: str | None = None) ->
 @app.get("/", include_in_schema=False)
 def serve_index(request: Request) -> FileResponse:
     if not INDEX_PATH.is_file():
-        raise HTTPException(status_code=503, detail="前端静态产物缺失，请先运行 npm run build:web。")
+        raise HTTPException(status_code=503, detail="页面资源暂未准备完成，请稍后再试。")
     return _make_static_response(INDEX_PATH, request)
 
 
@@ -423,5 +423,5 @@ def serve_static_asset(requested_path: str, request: Request) -> FileResponse:
             return _make_static_response(candidate_path, request)
 
     if not INDEX_PATH.is_file():
-        raise HTTPException(status_code=503, detail="前端静态产物缺失，请先运行 npm run build:web。")
+        raise HTTPException(status_code=503, detail="页面资源暂未准备完成，请稍后再试。")
     return _make_static_response(INDEX_PATH, request)

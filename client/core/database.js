@@ -95,7 +95,7 @@ export async function loadDatabase() {
     migrateProgressNodes(snapshot.database);
     return snapshot.database;
   }
-  throw new Error("服务器未返回初始化数据，请检查本地服务是否已完成站点初始化。");
+  throw new Error("暂时无法读取战队共享数据，请稍后再试或联系管理员确认服务状态。");
 }
 
 function normalizeDatabaseRoles(database) {
@@ -280,7 +280,7 @@ async function recoverFromPersistenceFailure(error) {
   const message = error instanceof Error && error.message ? error.message : "未知错误";
   pushFlash(
     synchronized
-      ? `保存失败，已恢复到电脑上的最新数据：${message}`
+      ? `保存失败，已恢复到最新共享数据：${message}`
       : `保存失败：${message}`,
     "info"
   );

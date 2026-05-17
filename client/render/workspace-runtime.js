@@ -24,8 +24,8 @@ export function renderWorkspaceRoot(root = appRoot) {
   } catch (error) {
     root.innerHTML = `
       <div style="padding:40px;color:#ff6666">
-        <h2>工作台渲染错误</h2>
-        <pre style="white-space:pre-wrap">${escapeHtml(error.stack || error.message || String(error))}</pre>
+        <h2>页面暂时无法显示</h2>
+        <p style="white-space:pre-wrap;color:#f2d7d7">当前页面内容加载失败，请刷新页面后重试；若仍无法恢复，请联系管理员协助处理。</p>
       </div>
     `;
     console.error("workspace render error:", error);
@@ -112,10 +112,10 @@ function renderPageLoadingState(routeId) {
   return `
     <section>
       <div class="page-header">
-        <div><h2>${escapeHtml(label)}</h2><p>页面代码已从首包中拆出，当前正在按需加载。</p></div>
+        <div><h2>${escapeHtml(label)}</h2><p>页面内容正在准备中，请稍候。</p></div>
       </div>
       <section class="panel">
-        <div class="empty-state">正在加载 ${escapeHtml(label)} 模块…</div>
+        <div class="empty-state">正在加载 ${escapeHtml(label)} 页面内容…</div>
       </section>
     </section>
   `;
@@ -133,7 +133,7 @@ function renderModal() {
       <div class="modal">
         <div class="modal-card glass-card">
           <div class="section-header">
-            <div><h3>正在加载操作面板</h3><p>当前弹窗代码已改为按需加载，请稍候。</p></div>
+            <div><h3>正在准备操作面板</h3><p>相关内容正在载入，请稍候。</p></div>
             <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
           </div>
           <div class="empty-state">正在加载弹窗内容…</div>

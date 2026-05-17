@@ -86,8 +86,8 @@ function renderAppImpl() {
   } catch (error) {
     appRoot.innerHTML = `
       <div style="padding:40px;color:#ff6666">
-        <h2>渲染错误</h2>
-        <pre style="white-space:pre-wrap">${escapeHtml(error.stack || error.message || String(error))}</pre>
+        <h2>页面暂时无法显示</h2>
+        <p style="white-space:pre-wrap;color:#f2d7d7">请刷新页面后重试；若仍无法恢复，请联系管理员协助处理。</p>
       </div>
     `;
     console.error("renderApp error:", error);
@@ -104,19 +104,19 @@ function getMemberRecord(memberId) {
 
 function renderInitializationErrorShell() {
   const secureContextTip = window.isSecureContext
-    ? "当前已是安全上下文，启动失败更可能来自浏览器缓存或本地数据异常。"
-    : "当前网址不是安全上下文。部分移动端浏览器在普通 HTTP 网穿地址下会限制 Web Crypto，建议优先改用 HTTPS 网穿地址。";
+    ? "当前页面未能顺利载入，通常与浏览器缓存、网络波动或临时同步异常有关。"
+    : "当前访问方式可能受到浏览器限制。请优先使用战队提供的正式访问入口，或改用更稳定的访问地址。";
   return `
     <div class="auth-layout">
       <section class="auth-panel">
         <div class="auth-card glass-card">
           <div class="boot-mark">Lion Hub</div>
-          <h1>应用启动失败</h1>
-          <p>初始化成员、任务与登录数据时发生错误，页面已停止在安全错误态。</p>
+          <h1>页面暂时无法打开</h1>
+          <p>连接战队工作台时出现问题，请稍后重试。</p>
           <div class="panel">
             <div class="definition-list">
-              <div class="definition-row"><span>错误信息</span><strong>${escapeHtml(state.initError)}</strong></div>
-              <div class="definition-row"><span>当前环境</span><strong>${window.isSecureContext ? "安全上下文" : "非安全上下文"}</strong></div>
+              <div class="definition-row"><span>当前状态</span><strong>暂时无法同步战队共享数据</strong></div>
+              <div class="definition-row"><span>访问环境</span><strong>${window.isSecureContext ? "已启用安全访问" : "当前访问方式受限"}</strong></div>
             </div>
           </div>
           <div class="feedback error">${escapeHtml(secureContextTip)}</div>
@@ -124,9 +124,9 @@ function renderInitializationErrorShell() {
       </section>
       <aside class="auth-aside">
         <div class="hero-panel glass-card">
-          <div class="brand-badge">Startup Diagnostics</div>
-          <h2>如果你是通过网穿地址在手机上打开，这里最常见的问题是使用了 HTTP 而不是 HTTPS。</h2>
-          <p>若仍失败，请强制刷新页面，或清掉浏览器站点缓存后重试。</p>
+          <div class="brand-badge">使用说明</div>
+          <h2>如果你是通过手机访问，请优先使用战队提供的正式入口。</h2>
+          <p>若仍无法进入，请刷新页面或清除站点缓存后重试；持续失败时请联系管理员协助处理。</p>
         </div>
       </aside>
     </div>
@@ -135,8 +135,8 @@ function renderInitializationErrorShell() {
 
 function renderAuthShell() {
   const hydrationMessage = state.databaseHydrating
-    ? "正在连接共享服务。提交注册或登录后会继续同步所需数据。"
-    : "首屏不会自动拉取全量共享数据，只有登录成功或提交注册时才会同步。";
+    ? "正在连接战队共享数据。登录或提交注册后会继续同步所需内容。"
+    : "首次打开后，登录成功或提交注册时会继续同步所需内容。";
   return `
     <div class="auth-layout">
       <section class="auth-panel">
@@ -147,7 +147,7 @@ function renderAuthShell() {
           </div>
           <div class="boot-mark">Lion Hub</div>
           <h1>${state.authMode === "login" ? "进入战队协作中枢" : "提交注册进入审核流"}</h1>
-          <p>${state.authMode === "login" ? "支持邮箱 + 密码登录。待审核账号登录后会进入审核中页面。" : "注册后自动进入待审核状态，由管理员分配身份、部门与系统权限。"}</p>
+          <p>${state.authMode === "login" ? "支持邮箱和密码登录。待审核账号登录后会进入审核中页面。" : "注册后会进入待审核状态，管理员会补充分工、身份与协作权限。"}</p>
           ${state.authMode === "login" ? renderLoginForm() : renderRegisterForm()}
           <div class="helper-text" style="margin-top:12px">${escapeHtml(hydrationMessage)}</div>
           <div class="feedback ${state.authFeedback ? "error" : ""}">${escapeHtml(state.authFeedback || "")}</div>
@@ -214,7 +214,7 @@ function renderWaitingShell(user) {
         <div class="auth-card glass-card">
           <div class="boot-mark">${isDisabled ? "Account Disabled" : isRejected ? "Review Result" : "Pending Review"}</div>
           <h1>${isDisabled ? "账号已停用" : isRejected ? "审核未通过" : "账号审核中"}</h1>
-          <p>${isDisabled ? "当前账号已被管理员停用，暂时不能进入工作台。如需恢复，请联系管理员处理。" : isRejected ? "当前账号尚未进入正式系统，请联系管理员修正资料后重新提交。" : "管理员会在审核中心分配成员身份、部门、兵种与系统权限，审核通过后即可进入完整工作台。"}</p>
+          <p>${isDisabled ? "当前账号已被管理员停用，暂时不能进入工作台。如需恢复，请联系管理员处理。" : isRejected ? "当前申请暂未通过，请联系管理员修正资料后重新提交。" : "管理员会在审核中心补充分工、身份与协作权限，审核通过后即可进入完整工作台。"}</p>
           <div class="panel">
             <div class="definition-list">
               <div class="definition-row"><span>申请人</span><strong>${escapeHtml(member?.name || user.username)}</strong></div>
@@ -231,9 +231,9 @@ function renderWaitingShell(user) {
       </section>
       <aside class="auth-aside">
         <div class="hero-panel glass-card">
-          <div class="brand-badge">Approval Pipeline</div>
+          <div class="brand-badge">审核说明</div>
           <h2>注册申请会直接进入审核中心。</h2>
-          <p>管理员可在审核中心查看注册申请，并为你设置成员身份、权限角色、所属部门、方向与兵种标签。</p>
+          <p>管理员会在审核中心查看你的注册资料，并补充成员身份、部门、方向和兵种标签。</p>
         </div>
       </aside>
     </div>
@@ -272,7 +272,7 @@ function renderWorkspaceLoadingShell(member = null) {
         <div class="topbar">
           <div class="search-shell">
             <button class="button-ghost mobile-toggle" type="button" data-action="toggle-nav">菜单</button>
-            <input type="text" placeholder="正在装载工作台数据…" value="" disabled>
+            <input type="text" placeholder="正在准备工作台内容…" value="" disabled>
           </div>
           <div class="topbar-actions">
             <span class="topbar-chip">同步中</span>
@@ -281,7 +281,7 @@ function renderWorkspaceLoadingShell(member = null) {
         <div class="page-content">
           <section>
             <div class="page-header">
-              <div><h2>${escapeHtml(routeLabel)}</h2><p>正在同步首屏数据与页面资源，工作台壳层已先显示。</p></div>
+              <div><h2>${escapeHtml(routeLabel)}</h2><p>页面正在准备中，工作台主体已先显示，稍后会补全当前内容。</p></div>
             </div>
             <section class="panel">
               <div class="empty-state">正在加载当前页面内容…</div>

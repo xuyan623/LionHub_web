@@ -192,7 +192,7 @@ export function renderPromotionDetailModal() {
           <div class="comment-card"><p>${escapeHtml(approval.comment || "暂无说明")}</p></div>
         </section>
         <section class="panel">
-          <div class="section-header"><div><h3>附件资料</h3><p>申请时上传的本地附件。</p></div></div>
+          <div class="section-header"><div><h3>附件资料</h3><p>申请时上传的附件材料。</p></div></div>
           <div class="comment-list">${(approval.attachments || []).length ? approval.attachments.map((attachment) => renderAttachmentCard(attachment)).join("") : renderEmpty("当前没有上传附件。")}</div>
         </section>
         <div class="button-row">
@@ -215,14 +215,14 @@ export function renderTaskCompletionModal() {
     <div class="modal">
       <div class="modal-card modal-card-completion glass-card">
         <div class="section-header">
-          <div><h3>完成提交</h3><p>任务进度到 100% 后，需要填写成果说明并把附件上传到这台电脑的本地目录后才能进入待审核。</p></div>
+          <div><h3>完成提交</h3><p>任务进度到 100% 后，需要填写成果说明并上传附件，才能进入待审核状态。</p></div>
           <button class="button-ghost" type="button" data-action="close-overlay">取消</button>
         </div>
         <form class="auth-form" data-form="task-submit" data-task-id="${task.id}">
           <input type="hidden" name="progressNote" value="${escapeAttribute(state.modal.progressNote || "")}">
           <label class="field-group"><span class="field-label">成果说明</span><textarea class="field-textarea" name="summary" placeholder="描述完成内容、验收方式与产出结论" required>${escapeHtml(latestSubmissionSummary)}</textarea></label>
-          <label class="field-group"><span class="field-label">本地附件上传</span><input class="field-input field-file-input" type="file" name="attachments" multiple onchange="this.nextElementSibling.textContent = this.files.length > 5 ? '单次最多上传 5 个文件。' : ''"><span class="helper-text file-count-warn" style="color:var(--danger)"></span></label>
-          <div class="helper-text">附件会上传到你电脑的 data/uploads/${escapeHtml(task.id)} 目录。可一次选择多个文件；如果本次不重新选择，将保留当前已上传的附件。</div>
+          <label class="field-group"><span class="field-label">上传附件</span><input class="field-input field-file-input" type="file" name="attachments" multiple onchange="this.nextElementSibling.textContent = this.files.length > 5 ? '单次最多上传 5 个文件。' : ''"><span class="helper-text file-count-warn" style="color:var(--danger)"></span></label>
+          <div class="helper-text">附件会上传到当前任务的共享附件区。可一次选择多个文件；如果本次不重新选择，将保留当前已上传的附件。</div>
           ${stagedProgressFiles.length ? `<div class="helper-text">当前有 ${stagedProgressFiles.length} 个从"更新进度"带入的附件，会在提交审核时一并上传。</div>` : ""}
           ${existingSubmissionAttachments.length ? `<div class="attachment-list-inline">${existingSubmissionAttachments.map((attachment) => `<span class="attachment-chip">${escapeHtml(attachment.name || "已上传附件")}</span>`).join("")}</div>` : ""}
 <div class="button-row">
@@ -670,7 +670,7 @@ export function renderFileManagerModal() {
     <div class="modal">
       <div class="modal-card modal-card-completion glass-card">
         <div class="section-header">
-          <div><h3>文件管理</h3><p>${files ? `共 ${files.length} 个上传文件` : "加载后即可查看和管理所有上传到服务器的本地附件。"}</p></div>
+          <div><h3>文件管理</h3><p>${files ? `共 ${files.length} 个上传文件` : "加载后即可查看和管理所有共享附件。"}</p></div>
           <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
         </div>
         ${!files ? `

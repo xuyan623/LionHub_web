@@ -19,7 +19,7 @@ export async function requestJson(url, options = {}) {
       headers,
     });
   } catch (error) {
-    throw new AppError("network", error, "无法连接本地共享服务，请确认电脑上的服务已启动且当前网穿地址可访问。");
+    throw new AppError("network", error, "无法连接战队共享服务，请确认当前访问地址可用后重试。");
   }
 
   const rawText = await response.text();

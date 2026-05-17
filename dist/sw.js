@@ -1,11 +1,11 @@
-const CACHE_VERSION = "build-20260516234752731";
+const CACHE_VERSION = "build-20260517005405384";
 const SHELL_CACHE = `shell-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `runtime-${CACHE_VERSION}`;
 
 const STATIC_ASSETS = [
   "/",
   "/index.html",
-  "/assets/bootstrap-7OEQFEYK.js",
+  "/assets/bootstrap-YASCQBAJ.js",
   "/assets/styles-FV43M7CN.css"
 ];
 

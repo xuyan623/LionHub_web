@@ -18,7 +18,7 @@ export function renderDashboardPage() {
   return `
     <section>
       <div class="page-header">
-        <div><h2>仪表盘</h2><p>总览成员负载、精选任务、积分排行与兵种项目进展，优先暴露管理层最关心的运行信号。</p></div>
+        <div><h2>仪表盘</h2><p>快速查看战队近期任务、成员协作分布、积分排行与兵种项目推进情况。</p></div>
       </div>
       <div class="metric-grid">
         ${renderMetricCard("当前成员数", stats.memberCount, "包含正常状态成员")}
@@ -43,7 +43,7 @@ export function renderDashboardPage() {
       </div>
       <div class="page-grid columns-2">
         <section class="panel">
-          <div class="section-header"><div><h3>成员负载</h3><p>用于任务分配与市场推荐的负载快照。</p></div></div>
+          <div class="section-header"><div><h3>成员负载</h3><p>帮助大家了解当前协作分布与任务压力。</p></div></div>
           <div class="member-stack">${loads.map((entry) => renderLoadRow(entry)).join("")}</div>
         </section>
         <section class="panel">
@@ -176,7 +176,7 @@ export function renderMembersPage() {
           <div class="member-stage-copy">
             <div class="market-stage-badge">Member Directory</div>
             <h2>成员管理</h2>
-            <p>按身份、部门、兵种和状态查看成员公开资料、负载与贡献数据。管理员可以直接维护成员档案。</p>
+            <p>按身份、部门、兵种和状态查看成员公开资料、负载与贡献数据。具备权限的成员可以维护成员档案。</p>
           </div>
           <div class="market-stage-meta">
             ${renderPointPill("成员总数", activeMembers.length)}
@@ -325,7 +325,7 @@ export function renderSettingsPage() {
   const settings = state.database.settings;
   return `
     <section>
-      <div class="page-header"><div><h2>系统设置</h2><p>管理员可维护任务结算与审核相关规则，确保站内流程与实际制度保持一致。</p></div></div>
+      <div class="page-header"><div><h2>系统设置</h2><p>具备权限的成员可维护任务结算与审核规则，确保站内流程与实际制度保持一致。</p></div></div>
       <form class="panel" data-form="settings">
         <div class="field-grid">
           <label class="field-group"><span class="field-label">中途加入折扣</span><input class="field-input" type="number" min="0" max="1" step="0.1" name="middleJoinDiscount" required value="${escapeAttribute(String(settings.middleJoinDiscount))}"></label>
