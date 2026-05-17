@@ -40,16 +40,36 @@ const buildResult = await build({
   write: !checkOnly,
 });
 
+const routeBuildResult = await build({
+  absWorkingDir: projectRoot,
+  bundle: true,
+  entryNames: "[name]-[hash]",
+  entryPoints: {
+    "route-market": "client/render/routes/market.js",
+  },
+  format: "esm",
+  logLevel: "info",
+  metafile: true,
+  outdir: distAssetsDir,
+  platform: "browser",
+  splitting: false,
+  target: ["es2020"],
+  write: !checkOnly,
+});
+
 const outputEntries = Object.entries(buildResult.metafile.outputs);
+const routeOutputEntries = Object.entries(routeBuildResult.metafile.outputs);
 const bootstrapAsset = findOutputForEntry(outputEntries, "frontend/app.js", ".js");
 const styleAsset = findOutputForEntry(outputEntries, "frontend/bundle.css", ".css");
+const marketRouteAsset = findOutputForEntry(routeOutputEntries, "client/render/routes/market.js", ".js");
 
-if (!bootstrapAsset || !styleAsset) {
+if (!bootstrapAsset || !styleAsset || !marketRouteAsset) {
   throw new Error("构建产物不完整：未找到 bootstrap JS 或 CSS 入口。");
 }
 
 const publicBootstrapPath = toPublicPath(bootstrapAsset);
 const publicStylePath = toPublicPath(styleAsset);
+const publicMarketRoutePath = toPublicPath(marketRouteAsset);
 const staticAssets = ["/", "/index.html", publicBootstrapPath, publicStylePath];
 
 const builtIndex = indexTemplate
@@ -71,6 +91,9 @@ if (!checkOnly) {
         buildVersion,
         bootstrap: publicBootstrapPath,
         style: publicStylePath,
+        routes: {
+          market: publicMarketRoutePath,
+        },
       },
       null,
       2

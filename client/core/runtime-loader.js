@@ -2,7 +2,7 @@ import { renderApp } from "./services.js";
 
 const routeLoaders = {
   dashboard: () => import("../render/routes/dashboard.js"),
-  market: () => import("../render/routes/market.js"),
+  market: () => loadExplicitRouteEntry("market"),
   myTasks: () => import("../render/routes/my-tasks.js"),
   taskManagement: () => import("../render/routes/task-management.js"),
   members: () => import("../render/routes/members.js"),
@@ -46,6 +46,7 @@ const modalGroupsByType = {
 let workspaceRuntimeModule = null;
 let workspaceRuntimePromise = null;
 let workspacePrefetchScheduled = false;
+let buildManifestPromise = null;
 
 const routeModules = new Map();
 const routePromises = new Map();
@@ -66,6 +67,57 @@ function hasCallableExport(module) {
     return true;
   }
   return Object.values(module).some((value) => typeof value === "function");
+}
+
+async function getBuildManifest() {
+  if (!buildManifestPromise) {
+    buildManifestPromise = fetch("/manifest.json", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error(`Unable to load build manifest: ${response.status}`);
+        }
+        return response.json();
+      })
+      .catch((error) => {
+        buildManifestPromise = null;
+        throw error;
+      });
+  }
+  return buildManifestPromise;
+}
+
+function appendRetryToken(url, retryIndex) {
+  if (retryIndex <= 0) {
+    return url;
+  }
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}retry=${Date.now()}-${retryIndex}`;
+}
+
+async function importRouteEntryModule(routeEntryUrl, routeId) {
+  let lastError = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const importUrl = appendRetryToken(routeEntryUrl, attempt);
+    try {
+      const module = await import(importUrl);
+      if (!hasCallableExport(module)) {
+        throw new Error(`Route chunk "${routeId}" loaded without callable exports.`);
+      }
+      return module;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error(`Route chunk "${routeId}" failed to load.`);
+}
+
+async function loadExplicitRouteEntry(routeId) {
+  const manifest = await getBuildManifest();
+  const routeEntryUrl = manifest?.routes?.[routeId];
+  if (!routeEntryUrl) {
+    throw new Error(`Route manifest entry missing for "${routeId}".`);
+  }
+  return importRouteEntryModule(routeEntryUrl, routeId);
 }
 
 export function getLoadedWorkspaceRuntime() {
