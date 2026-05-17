@@ -137,9 +137,9 @@ export async function handleRetireForm(form) {
 }
 
 export async function exportMembersCsv() {
-  const rows = [["姓名","成员身份","角色","部门","兵种","技能标签"]];
+  const rows = [["姓名","成员身份","部门","兵种","技能标签"]];
   state.database.members.forEach((m) => {
-    rows.push([m.name, dictionaries.identities[m.identity] || m.identity, dictionaries.roles[m.role] || m.role, m.departments.join(";"), m.robotGroups.join(";"), m.skillTags.join(";")]);
+    rows.push([m.name, dictionaries.identities[m.identity] || m.identity, m.departments.join(";"), m.robotGroups.join(";"), m.skillTags.join(";")]);
   });
   downloadCsv("成员列表.csv", rows);
 }

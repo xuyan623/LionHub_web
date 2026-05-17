@@ -1,9 +1,8 @@
 import { renderApp } from "./services.js";
-import { renderMarketPage } from "../render/pages.js";
 
 const routeLoaders = {
   dashboard: () => import("../render/routes/dashboard.js"),
-  market: () => Promise.resolve({ render: renderMarketPage }),
+  market: () => import("../render/routes/market.js"),
   myTasks: () => import("../render/routes/my-tasks.js"),
   taskManagement: () => import("../render/routes/task-management.js"),
   members: () => import("../render/routes/members.js"),
@@ -46,6 +45,7 @@ const modalGroupsByType = {
 
 let workspaceRuntimeModule = null;
 let workspaceRuntimePromise = null;
+let workspacePrefetchScheduled = false;
 
 const routeModules = new Map();
 const routePromises = new Map();
@@ -96,7 +96,7 @@ export function getLoadedRouteChunk(routeId) {
   return routeModules.get(routeId) || null;
 }
 
-export function loadRouteChunk(routeId) {
+export function loadRouteChunk(routeId, options = {}) {
   const normalizedRoute = routeLoaders[routeId] ? routeId : "dashboard";
   if (routeModules.has(normalizedRoute)) {
     return Promise.resolve(routeModules.get(normalizedRoute));
@@ -110,7 +110,9 @@ export function loadRouteChunk(routeId) {
         throw new Error(`Route chunk "${normalizedRoute}" loaded without callable exports.`);
       }
       routeModules.set(normalizedRoute, module);
-      renderApp();
+      if (options.render !== false) {
+        renderApp();
+      }
       return module;
     })
     .catch((error) => {
@@ -133,7 +135,7 @@ export function getLoadedModalChunk(modalType) {
   return modalGroupModules.get(groupName) || null;
 }
 
-export function loadModalChunk(modalType) {
+export function loadModalChunk(modalType, options = {}) {
   const groupName = getModalGroup(modalType);
   if (modalGroupModules.has(groupName)) {
     return Promise.resolve(modalGroupModules.get(groupName));
@@ -147,7 +149,9 @@ export function loadModalChunk(modalType) {
         throw new Error(`Modal chunk "${groupName}" loaded without callable exports.`);
       }
       modalGroupModules.set(groupName, module);
-      renderApp();
+      if (options.render !== false) {
+        renderApp();
+      }
       return module;
     })
     .catch((error) => {
@@ -159,4 +163,31 @@ export function loadModalChunk(modalType) {
     });
   modalGroupPromises.set(groupName, promise);
   return promise;
+}
+
+function runWhenBrowserIsIdle(callback) {
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(callback, { timeout: 1200 });
+    return;
+  }
+  window.setTimeout(callback, 320);
+}
+
+export function scheduleWorkspacePrefetch() {
+  if (workspacePrefetchScheduled) {
+    return;
+  }
+  workspacePrefetchScheduled = true;
+
+  runWhenBrowserIsIdle(() => {
+    const preferredRoutes = ["market", "myTasks", "members", "rankings"];
+    const preferredModals = ["member-detail", "task-detail", "approval-action"];
+
+    preferredRoutes.forEach((routeId) => {
+      void loadRouteChunk(routeId, { render: false }).catch(() => {});
+    });
+    preferredModals.forEach((modalType) => {
+      void loadModalChunk(modalType, { render: false }).catch(() => {});
+    });
+  });
 }

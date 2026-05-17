@@ -1,4 +1,4 @@
-import { state, savePersistentState } from "../client/core/state.js";
+import { state, savePersistentState, createDefaultMarketFilters, createDefaultMemberFilters, createDefaultFileFilters } from "../client/core/state.js";
 import { renderApp } from "../client/render/core.js";
 import { pushFlash } from "../client/core/services.js";
 import { pushModal, popModal, replaceModal, clearModalStack } from "../client/core/modal.js";
@@ -171,6 +171,7 @@ document.addEventListener("click", async (event) => {
 
   if (action === "set-ranking-tab") {
     state.rankingTab = actionTarget.dataset.tab;
+    state.rankingPage = 0;
     savePersistentState();
     renderApp();
     return;
@@ -178,6 +179,7 @@ document.addEventListener("click", async (event) => {
 
   if (action === "set-ranking-range") {
     state.rankingRange = actionTarget.dataset.range;
+    state.rankingPage = 0;
     savePersistentState();
     renderApp();
     return;
@@ -192,6 +194,51 @@ document.addEventListener("click", async (event) => {
 
   if (action === "set-member-view") {
     state.memberView = actionTarget.dataset.view;
+    state.memberPage = 0;
+    savePersistentState();
+    renderApp();
+    return;
+  }
+
+  if (action === "member-page") {
+    const page = parseInt(actionTarget.dataset.page, 10);
+    if (!Number.isNaN(page) && page >= 0) {
+      state.memberPage = page;
+      renderApp();
+    }
+    return;
+  }
+
+  if (action === "market-page") {
+    const page = parseInt(actionTarget.dataset.page, 10);
+    if (!Number.isNaN(page) && page >= 0) {
+      state.marketPage = page;
+      renderApp();
+    }
+    return;
+  }
+
+  if (action === "ranking-page") {
+    const page = parseInt(actionTarget.dataset.page, 10);
+    if (!Number.isNaN(page) && page >= 0) {
+      state.rankingPage = page;
+      renderApp();
+    }
+    return;
+  }
+
+  if (action === "clear-filters") {
+    const { group } = actionTarget.dataset;
+    if (group === "market") {
+      state.marketFilters = createDefaultMarketFilters();
+      state.marketPage = 0;
+    } else if (group === "member") {
+      state.memberFilters = createDefaultMemberFilters();
+      state.memberPage = 0;
+    } else if (group === "files") {
+      state.fileFilters = createDefaultFileFilters();
+      state.settingsFilePage = 0;
+    }
     savePersistentState();
     renderApp();
     return;
@@ -678,6 +725,13 @@ document.addEventListener("input", (event) => {
     const key = target.dataset.filterKey;
     const source = group === "member" ? state.memberFilters : group === "files" ? state.fileFilters : state.marketFilters;
     source[key] = target.value;
+    if (group === "market") {
+      state.marketPage = 0;
+    } else if (group === "member") {
+      state.memberPage = 0;
+    } else if (group === "files") {
+      state.settingsFilePage = 0;
+    }
 
     if (filterDebounceTimer !== null) {
       clearTimeout(filterDebounceTimer);

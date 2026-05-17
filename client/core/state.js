@@ -10,14 +10,6 @@ export const UPLOAD_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 export const MAX_UPLOAD_COUNT = 5;
 
 export const dictionaries = {
-  roles: {
-    admin: "管理员",
-    leader: "组长",
-    formal_member: "正式队员",
-    reserve: "梯队队员",
-    seedling: "育苗队员",
-    teacher: "指导老师",
-  },
   identities: {
     captain: "队长",
     vice_captain: "副队长",
@@ -109,7 +101,6 @@ export const options = {
   marketTaskStatuses: ["market_open", ...Object.keys(dictionaries.taskStatuses)],
   priorities: Object.keys(dictionaries.priorities),
   difficulties: Object.keys(dictionaries.difficulties),
-  roles: Object.keys(dictionaries.roles),
   identities: Object.keys(dictionaries.identities),
 };
 
@@ -152,7 +143,6 @@ const DEFAULT_MARKET_FILTERS = {
 
 const DEFAULT_MEMBER_FILTERS = {
   query: "",
-  role: "all",
   department: "all",
   robotGroup: "all",
 };
@@ -166,6 +156,18 @@ const DEFAULT_TABLE_SORT = {
   column: "",
   direction: "asc",
 };
+
+export function createDefaultMarketFilters() {
+  return { ...DEFAULT_MARKET_FILTERS };
+}
+
+export function createDefaultMemberFilters() {
+  return { ...DEFAULT_MEMBER_FILTERS };
+}
+
+export function createDefaultFileFilters() {
+  return { ...DEFAULT_FILE_FILTERS };
+}
 
 function loadPersistentState() {
   try {
@@ -197,6 +199,7 @@ export const state = {
   databaseReady: false,
   databaseHydrating: false,
   databaseVersion: 0,
+  renderCycleVersion: 0,
   currentUserId: null,
   route: "dashboard",
   authMode: "login",
@@ -207,9 +210,12 @@ export const state = {
   flashTone: "info",
   flashTimer: null,
   marketFilters: { ...DEFAULT_MARKET_FILTERS, ...persisted.marketFilters },
+  marketPage: 0,
   memberFilters: { ...DEFAULT_MEMBER_FILTERS, ...persisted.memberFilters },
+  memberPage: 0,
   rankingTab: persisted.rankingTab ?? "composite",
   rankingRange: persisted.rankingRange ?? "total",
+  rankingPage: 0,
   taskManageView: persisted.taskManageView ?? "kanban",
   reviewTab: persisted.reviewTab ?? "registration",
   modal: null,

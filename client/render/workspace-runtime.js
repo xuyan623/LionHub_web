@@ -2,7 +2,7 @@ import { appRoot, dictionaries, state } from "../core/state.js";
 import { escapeAttribute, escapeHtml } from "../core/security.js";
 import { formatDateTime } from "../core/format.js";
 import { getInitials } from "../core/utils.js";
-import { getLoadedModalChunk, getLoadedRouteChunk, loadModalChunk, loadRouteChunk } from "../core/runtime-loader.js";
+import { getLoadedModalChunk, getLoadedRouteChunk, loadModalChunk, loadRouteChunk, scheduleWorkspacePrefetch } from "../core/runtime-loader.js";
 import { saveSession } from "../core/session.js";
 import { getCurrentMember, getCurrentUser, getSearchPlaceholder, getMemberById } from "../domain/query.js";
 import { canCreateTask, getVisibleRoutes } from "../domain/permissions.js";
@@ -20,6 +20,7 @@ export function renderWorkspaceRoot(root = appRoot) {
       root.innerHTML = "";
       return;
     }
+    scheduleWorkspacePrefetch();
     root.innerHTML = renderWorkspace();
   } catch (error) {
     root.innerHTML = `
@@ -53,7 +54,7 @@ function renderWorkspace() {
         </div>
         <div class="sidebar-footer">
           <strong>${escapeHtml(member.name)}</strong>
-          <span>${escapeHtml(dictionaries.identities[member.identity])} · ${escapeHtml(dictionaries.roles[member.role])}</span>
+          <span>${escapeHtml(dictionaries.identities[member.identity])}</span>
           <span class="helper-text">${escapeHtml(member.departments.join(" / "))}</span>
           <div class="button-row">
             <button class="button-secondary" type="button" data-action="navigate" data-route="profile">个人中心</button>
@@ -78,7 +79,7 @@ function renderWorkspace() {
             ${canCreateTask() ? '<button class="button-primary" type="button" data-action="open-create-task">新建任务</button>' : ""}
             <div class="profile-pill">
               <div class="avatar">${escapeHtml(getInitials(member.name))}</div>
-              <div><strong>${escapeHtml(member.name)}</strong><div class="helper-text">${escapeHtml(dictionaries.roles[member.role])}</div></div>
+              <div><strong>${escapeHtml(member.name)}</strong><div class="helper-text">${escapeHtml(dictionaries.identities[member.identity])}</div></div>
             </div>
           </div>
         </div>

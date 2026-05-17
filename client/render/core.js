@@ -44,6 +44,8 @@ export function renderApp() {
 
 function renderAppImpl() {
   try {
+    state.renderCycleVersion += 1;
+
     if (state.initError) {
       appRoot.innerHTML = renderInitializationErrorShell();
       return;
@@ -260,7 +262,7 @@ function renderWorkspaceLoadingShell(member = null) {
         </div>
         <div class="sidebar-footer">
           <strong>${escapeHtml(member?.name || "正在恢复会话")}</strong>
-          <span>${escapeHtml(member ? `${dictionaries.identities[member.identity]} · ${dictionaries.roles[member.role]}` : "同步成员资料中")}</span>
+          <span>${escapeHtml(member ? `${dictionaries.identities[member.identity]}` : "同步成员资料中")}</span>
           <span class="helper-text">${escapeHtml(member?.departments?.join(" / ") || "首次进入会先加载工作台数据")}</span>
           <div class="button-row">
             <button class="button-secondary" type="button" data-action="navigate" data-route="profile">个人中心</button>

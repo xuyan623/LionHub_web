@@ -150,6 +150,27 @@
   background: rgba(255, 255, 255, 0.035);
 }
 
+.board-results {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.board-results strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.board-results span {
+  color: var(--text-soft);
+  font-size: 0.92rem;
+}
+
 .market-waterfall {
   column-width: 340px;
   column-gap: 16px;

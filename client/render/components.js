@@ -2,7 +2,7 @@ import { state, dictionaries, options, FILES_PER_PAGE } from "../core/state.js";
 import { escapeHtml, escapeAttribute } from "../core/security.js";
 import { formatDateTime, formatShortDate } from "../core/format.js";
 import { truncate, getInitials, toArray, joinOr } from "../core/utils.js";
-import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecords, getTaskParticipantRecordsByMember, getMemberPointSummary, getMemberLoads, getActiveParticipantCount, getJoinActionLabel, getApprovalById, getAttachmentsIndex } from "../domain/query.js";
+import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecords, getTaskParticipantRecordsByMember, getMemberPointSummary, getMemberLoadById, getActiveParticipantCount, getJoinActionLabel, getApprovalById, getAttachmentsIndex } from "../domain/query.js";
 import { canReview, canDeleteAllGeneratedData, canDeleteTaskGeneratedData, canInteractWithTasks, canDeletePointTransaction, canDeleteApprovalRecord, isAdmin, isRetiredMember, isDisabledMember, canMemberBeAddedToTask, getLifecycleBlockingTasks, isTaskOpenStatus } from "../domain/permissions.js";
 import { getLatestSubmissionSummary } from "../domain/task.js";
 
@@ -114,14 +114,14 @@ export function renderTaskCard(task, config = {}) {
 
 export function renderMemberCard(member, config = {}) {
   const summary = getMemberPointSummary(member.id);
-  const load = getMemberLoads().find((entry) => entry.member.id === member.id);
+  const load = getMemberLoadById(member.id);
   const className = ["member-card", config.selected ? "is-selected" : "", config.waterfall ? "is-waterfall" : ""].filter(Boolean).join(" ");
   return `
     <button class="${className}" type="button" data-action="open-member" data-member-id="${member.id}">
       <div class="member-top">
         <div>
           <h4>${escapeHtml(member.name)}</h4>
-          <div class="member-meta"><span>${escapeHtml(dictionaries.roles[member.role])}</span><span>${escapeHtml(member.departments.join(" / "))}</span></div>
+          <div class="member-meta"><span>${escapeHtml(dictionaries.identities[member.identity])}</span><span>${escapeHtml(member.departments.join(" / "))}</span></div>
         </div>
         <div class="avatar">${escapeHtml(getInitials(member.name))}</div>
       </div>
@@ -414,18 +414,31 @@ export function renderFilterSelect(label, group, key, value, sourceOptions, labe
   `;
 }
 
+export function renderPager(action, currentPage, totalItems, pageSize, emptyText = "当前没有更多内容。") {
+  if (totalItems <= pageSize) {
+    return totalItems ? "" : `<div class="helper-text">${escapeHtml(emptyText)}</div>`;
+  }
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  return `
+    <div class="pager">
+      <button class="button-secondary" type="button" data-action="${escapeAttribute(action)}" data-page="${currentPage - 1}" ${currentPage === 0 ? "disabled" : ""}>上一页</button>
+      <span class="helper-text">第 ${currentPage + 1} / ${totalPages} 页</span>
+      <button class="button-secondary" type="button" data-action="${escapeAttribute(action)}" data-page="${currentPage + 1}" ${currentPage + 1 >= totalPages ? "disabled" : ""}>下一页</button>
+    </div>
+  `;
+}
+
 export function getPendingApprovalCount() {
   return state.database.approvals.filter((approval) => approval.status === "pending").length;
 }
 
 export function renderMemberDetail(member) {
   const summary = getMemberPointSummary(member.id);
-  const load = getMemberLoads().find((entry) => entry.member.id === member.id);
+  const load = getMemberLoadById(member.id);
   return `
     <div class="definition-list">
       <div class="definition-row"><span>姓名</span><strong>${escapeHtml(member.name)}</strong></div>
       <div class="definition-row"><span>成员身份</span><strong>${escapeHtml(dictionaries.identities[member.identity])}</strong></div>
-      <div class="definition-row"><span>权限角色</span><strong>${escapeHtml(dictionaries.roles[member.role])}</strong></div>
       <div class="definition-row"><span>部门 / 方向</span><strong>${escapeHtml(member.departments.join(" / "))} / ${escapeHtml(member.directions.join(" / ") || "未设置")}</strong></div>
       <div class="definition-row"><span>兵种组</span><strong>${escapeHtml(member.robotGroups.join(" / ") || "未设置")}</strong></div>
       <div class="definition-row"><span>技能标签</span><strong>${escapeHtml(member.skillTags.join("、") || "暂无")}</strong></div>
@@ -473,12 +486,11 @@ export function renderMemberTable(members) {
   if (!members.length) return renderEmpty("没有匹配筛选条件的成员。");
   const rows = members.map((m) => {
     const summary = getMemberPointSummary(m.id);
-    const load = getMemberLoads().find((entry) => entry.member.id === m.id);
+    const load = getMemberLoadById(m.id);
     return `
       <tr>
         <td><button class="button-ghost" type="button" data-action="open-member" data-member-id="${m.id}" style="padding:4px 8px;font-size:0.9rem">${escapeHtml(m.name)}</button></td>
         <td>${escapeHtml(dictionaries.identities[m.identity])}</td>
-        <td>${escapeHtml(dictionaries.roles[m.role])}</td>
         <td>${escapeHtml(m.departments.join(" / "))}</td>
         <td>${escapeHtml(m.robotGroups.join(" / ") || "通用")}</td>
         <td>${escapeHtml(m.skillTags.join("、") || "-")}</td>
@@ -487,5 +499,5 @@ export function renderMemberTable(members) {
       </tr>
     `;
   }).join("");
-  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>姓名</th><th>身份</th><th>角色</th><th>部门</th><th>兵种</th><th>技能</th><th>负载</th><th>综合贡献</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>姓名</th><th>身份</th><th>部门</th><th>兵种</th><th>技能</th><th>负载</th><th>综合贡献</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }

@@ -38,6 +38,37 @@ export {
   getActiveParticipantCount,
 };
 
+const EMPTY_POINT_SUMMARY = Object.freeze({
+  study: 0,
+  labor: 0,
+  management: 0,
+  compensation: 0,
+  composite: 0,
+});
+
+let renderDerivedCache = {
+  cycle: -1,
+  values: new Map(),
+};
+
+function getRenderDerivedCache() {
+  if (renderDerivedCache.cycle !== state.renderCycleVersion) {
+    renderDerivedCache = {
+      cycle: state.renderCycleVersion,
+      values: new Map(),
+    };
+  }
+  return renderDerivedCache.values;
+}
+
+function getCachedDerivedValue(key, computeValue) {
+  const cache = getRenderDerivedCache();
+  if (!cache.has(key)) {
+    cache.set(key, computeValue());
+  }
+  return cache.get(key);
+}
+
 export function getLoadLevel(activeCount, dueSoon, overdue) {
   if (activeCount <= 1) {
     return "idle";
@@ -150,8 +181,116 @@ function formatShortDate(dateString) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
+function createPointSummary() {
+  return { study: 0, labor: 0, management: 0, compensation: 0, composite: 0 };
+}
+
+function accumulatePointSummary(summary, transaction) {
+  if (transaction.type === "study") summary.study += transaction.amount;
+  if (transaction.type === "labor") summary.labor += transaction.amount;
+  if (transaction.type === "management") summary.management += transaction.amount;
+  if (transaction.type === "compensation") summary.compensation += transaction.amount;
+}
+
+function finalizePointSummary(summary) {
+  const study = roundPointFromSettings(summary.study);
+  const labor = roundPointFromSettings(summary.labor);
+  const management = roundPointFromSettings(summary.management);
+  const compensation = roundPointFromSettings(summary.compensation);
+  return {
+    study,
+    labor,
+    management,
+    compensation,
+    composite: roundPointFromSettings(study + labor + management + compensation),
+  };
+}
+
+function getWorkspaceMembers() {
+  return getCachedDerivedValue("workspaceMembers", () => state.database.members.filter((member) => isMemberIncludedInWorkspaceStats(member)));
+}
+
+function getRankingMembers() {
+  return getCachedDerivedValue("rankingMembers", () => state.database.members.filter((member) => isMemberIncludedInRankings(member)));
+}
+
+function getPointSummaryIndex() {
+  return getCachedDerivedValue("pointSummaryIndex", () => {
+    const totalRaw = new Map();
+    const monthRaw = new Map();
+
+    state.database.pointTransactions.forEach((transaction) => {
+      if (!totalRaw.has(transaction.memberId)) {
+        totalRaw.set(transaction.memberId, createPointSummary());
+      }
+      accumulatePointSummary(totalRaw.get(transaction.memberId), transaction);
+
+      if (isThisMonth(transaction.createdAt)) {
+        if (!monthRaw.has(transaction.memberId)) {
+          monthRaw.set(transaction.memberId, createPointSummary());
+        }
+        accumulatePointSummary(monthRaw.get(transaction.memberId), transaction);
+      }
+    });
+
+    const total = new Map();
+    const month = new Map();
+    totalRaw.forEach((summary, memberId) => total.set(memberId, finalizePointSummary(summary)));
+    monthRaw.forEach((summary, memberId) => month.set(memberId, finalizePointSummary(summary)));
+    return { total, month };
+  });
+}
+
+function getMemberLoadIndex() {
+  return getCachedDerivedValue("memberLoadIndex", () => {
+    const loadEntries = new Map(
+      getWorkspaceMembers().map((member) => [
+        member.id,
+        { member, activeCount: 0, pendingReview: 0, dueSoon: 0, overdue: 0, loadLevel: "idle" },
+      ])
+    );
+    const tasksById = new Map(state.database.tasks.map((task) => [task.id, task]));
+
+    state.database.taskParticipants.forEach((participant) => {
+      if (participant.status !== "involved") {
+        return;
+      }
+      const entry = loadEntries.get(participant.memberId);
+      if (!entry) {
+        return;
+      }
+      const task = tasksById.get(participant.taskId);
+      if (!task || !["todo", "in_progress", "pending_review", "overdue"].includes(task.status)) {
+        return;
+      }
+      entry.activeCount += 1;
+      if (task.status === "pending_review") {
+        entry.pendingReview += 1;
+      }
+      if (task.status === "overdue") {
+        entry.overdue += 1;
+      }
+      if (daysUntil(task.dueAt) <= 3) {
+        entry.dueSoon += 1;
+      }
+    });
+
+    const list = [...loadEntries.values()]
+      .map((entry) => ({
+        ...entry,
+        loadLevel: getLoadLevel(entry.activeCount, entry.dueSoon, entry.overdue),
+      }))
+      .sort((left, right) => loadLevelOrder(right.loadLevel) - loadLevelOrder(left.loadLevel) || right.activeCount - left.activeCount);
+
+    return {
+      list,
+      byMemberId: new Map(list.map((entry) => [entry.member.id, entry])),
+    };
+  });
+}
+
 export function getDashboardStats() {
-  const members = state.database.members.filter((member) => isMemberIncludedInWorkspaceStats(member));
+  const members = getWorkspaceMembers();
   const tasks = state.database.tasks;
   return {
     memberCount: members.length,
@@ -216,14 +355,13 @@ export function getVisibleTaskManagementTasks() {
 }
 
 export function getFilteredMembers() {
-  return state.database.members.filter((member) => {
+  return getWorkspaceMembers().filter((member) => {
     if (!isMemberIncludedInWorkspaceStats(member)) {
       return false;
     }
     const query = `${member.name} ${member.bio} ${member.departments.join(" ")} ${member.skillTags.join(" ")}`.toLowerCase();
     const mergedQuery = `${state.memberFilters.query} ${state.globalSearch}`.trim().toLowerCase();
     if (mergedQuery && !query.includes(mergedQuery)) return false;
-    if (state.memberFilters.role !== "all" && member.role !== state.memberFilters.role) return false;
     if (state.memberFilters.department !== "all" && !member.departments.includes(state.memberFilters.department)) return false;
     if (state.memberFilters.robotGroup !== "all" && !member.robotGroups.includes(state.memberFilters.robotGroup)) return false;
     return true;
@@ -231,24 +369,16 @@ export function getFilteredMembers() {
 }
 
 export function getMemberLoads() {
-  return state.database.members
-    .filter((member) => isMemberIncludedInWorkspaceStats(member))
-    .map((member) => {
-      const activeTasks = getTaskParticipantRecordsByMember(member.id).filter(
-        (participant) => participant.status === "involved" && ["todo", "in_progress", "pending_review", "overdue"].includes(getTaskById(participant.taskId)?.status)
-      );
-      const pendingReview = activeTasks.filter((participant) => getTaskById(participant.taskId)?.status === "pending_review").length;
-      const overdue = activeTasks.filter((participant) => getTaskById(participant.taskId)?.status === "overdue").length;
-      const dueSoon = activeTasks.filter((participant) => daysUntil(getTaskById(participant.taskId)?.dueAt) <= 3).length;
-      const loadLevel = getLoadLevel(activeTasks.length, dueSoon, overdue);
-      return { member, activeCount: activeTasks.length, pendingReview, dueSoon, overdue, loadLevel };
-    })
-    .sort((left, right) => loadLevelOrder(right.loadLevel) - loadLevelOrder(left.loadLevel) || right.activeCount - left.activeCount);
+  return getMemberLoadIndex().list;
+}
+
+export function getMemberLoadById(memberId) {
+  return getMemberLoadIndex().byMemberId.get(memberId) || null;
 }
 
 export function getDepartmentContribution() {
   const totals = new Map();
-  state.database.members.filter((member) => isMemberIncludedInRankings(member)).forEach((member) => {
+  getRankingMembers().forEach((member) => {
     const summary = getMemberPointSummary(member.id);
     const department = member.departments[0] || "未分组";
     totals.set(department, (totals.get(department) || 0) + summary.composite);
@@ -270,13 +400,14 @@ export function getRobotContribution() {
 }
 
 export function getLeaderboard(type, range) {
-  return state.database.members
-    .filter((member) => isMemberIncludedInRankings(member))
-    .map((member) => {
-      const summary = getMemberPointSummary(member.id, range === "month");
-      return { member, values: summary, score: type === "study" ? summary.study : type === "labor" ? summary.labor : type === "management" ? summary.management : summary.composite };
-    })
-    .sort((left, right) => right.score - left.score);
+  return getCachedDerivedValue(`leaderboard:${type}:${range}`, () =>
+    getRankingMembers()
+      .map((member) => {
+        const summary = getMemberPointSummary(member.id, range === "month");
+        return { member, values: summary, score: type === "study" ? summary.study : type === "labor" ? summary.labor : type === "management" ? summary.management : summary.composite };
+      })
+      .sort((left, right) => right.score - left.score)
+  );
 }
 
 export function getApprovalGroups() {
@@ -307,21 +438,8 @@ export function getApprovalGroups() {
 }
 
 export function getMemberPointSummary(memberId, monthOnly = false) {
-  const summary = { study: 0, labor: 0, management: 0, compensation: 0, composite: 0 };
-  state.database.pointTransactions.forEach((transaction) => {
-    if (transaction.memberId !== memberId) return;
-    if (monthOnly && !isThisMonth(transaction.createdAt)) return;
-    if (transaction.type === "study") summary.study += transaction.amount;
-    if (transaction.type === "labor") summary.labor += transaction.amount;
-    if (transaction.type === "management") summary.management += transaction.amount;
-    if (transaction.type === "compensation") summary.compensation += transaction.amount;
-  });
-  summary.study = roundPointFromSettings(summary.study);
-  summary.labor = roundPointFromSettings(summary.labor);
-  summary.management = roundPointFromSettings(summary.management);
-  summary.compensation = roundPointFromSettings(summary.compensation);
-  summary.composite = roundPointFromSettings(summary.study + summary.labor + summary.management + summary.compensation);
-  return summary;
+  const summaries = getPointSummaryIndex();
+  return (monthOnly ? summaries.month.get(memberId) : summaries.total.get(memberId)) || EMPTY_POINT_SUMMARY;
 }
 
 export function getMemberTimeline(memberId) {

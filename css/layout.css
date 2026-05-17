@@ -489,6 +489,14 @@
   color: var(--text-soft);
 }
 
+.pager {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
 .demo-credentials {
   margin-top: 26px;
   display: grid;
@@ -770,4 +778,21 @@
 .modal-card p {
   margin: 0 0 16px;
   color: var(--text-soft);
+}
+
+.modal-actions-sticky {
+  position: sticky;
+  bottom: -26px;
+  margin: 8px -26px -26px;
+  padding: 16px 26px 20px;
+  border-top: 1px solid var(--line);
+  background: linear-gradient(180deg, rgba(18, 18, 20, 0.82), rgba(18, 18, 20, 0.96));
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  display: grid;
+  gap: 12px;
+}
+
+.ranking-hero {
+  margin-bottom: 18px;
 }
