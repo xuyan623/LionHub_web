@@ -4,6 +4,7 @@ __pycache__/
 *.pyo
 .venv/
 node_modules/
+dist/
 data/runtime/
 .edge-test-profile/
 edge-dom.html
