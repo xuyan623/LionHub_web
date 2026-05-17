@@ -217,13 +217,15 @@ export function getVisibleTaskManagementTasks() {
 
 export function getFilteredMembers() {
   return state.database.members.filter((member) => {
+    if (!isMemberIncludedInWorkspaceStats(member)) {
+      return false;
+    }
     const query = `${member.name} ${member.bio} ${member.departments.join(" ")} ${member.skillTags.join(" ")}`.toLowerCase();
     const mergedQuery = `${state.memberFilters.query} ${state.globalSearch}`.trim().toLowerCase();
     if (mergedQuery && !query.includes(mergedQuery)) return false;
     if (state.memberFilters.role !== "all" && member.role !== state.memberFilters.role) return false;
     if (state.memberFilters.department !== "all" && !member.departments.includes(state.memberFilters.department)) return false;
     if (state.memberFilters.robotGroup !== "all" && !member.robotGroups.includes(state.memberFilters.robotGroup)) return false;
-    if (state.memberFilters.status !== "all" && member.memberStatus !== state.memberFilters.status) return false;
     return true;
   });
 }

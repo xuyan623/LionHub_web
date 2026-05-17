@@ -426,7 +426,6 @@ function renderTaskEditParticipantRow(task, participant) {
             <span>${escapeHtml(participant.role)}</span>
             <span>${escapeHtml(participant.joinType === "middle" ? "中途加入" : "初始参与")}</span>
             <span>${escapeHtml(member?.departments?.[0] || "未分组")}</span>
-            <span>${escapeHtml(dictionaries.memberStatuses[member?.memberStatus] || "正常")}</span>
           </div>
         </div>
         <span class="point-pill">比例 ${participant.contributionRatio}</span>
@@ -442,13 +441,15 @@ function renderTaskEditParticipantRow(task, participant) {
 export function renderMemberFormModal() {
   const member = getMemberById(state.modal.memberId);
   if (!member) return "";
-  const lifecycleExplanation = !member.hiddenFromDirectory && member.memberStatus === "normal" ? getLifecycleActionDefinition("force-retire-member", member.id)?.description || "" : "";
+  const lifecycleExplanation = !member.hiddenFromDirectory && member.memberStatus !== "retired" && member.memberStatus !== "disabled"
+    ? getLifecycleActionDefinition("force-retire-member", member.id)?.description || ""
+    : "";
   const blockingTasks = member.hiddenFromDirectory ? [] : getLifecycleBlockingTasks(member.id);
   return `
     <div class="modal">
       <div class="modal-card glass-card">
         <div class="section-header">
-          <div><h3>编辑成员</h3><p>管理员可直接修改成员身份、角色、部门、方向、兵种与状态。</p></div>
+          <div><h3>编辑成员</h3><p>管理员可直接修改成员身份、角色、部门、方向和兵种信息。</p></div>
           <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
         </div>
         ${blockingTasks.length ? `
@@ -463,9 +464,8 @@ export function renderMemberFormModal() {
             <label class="field-group"><span class="field-label">姓名</span><input class="field-input" type="text" name="name" value="${escapeAttribute(member.name)}" required></label>
             <label class="field-group"><span class="field-label">手机号</span><input class="field-input" type="text" name="phone" value="${escapeAttribute(member.phone || "")}"></label>
           </div>
-          <div class="field-grid-3">
+          <div class="field-grid">
             <label class="field-group"><span class="field-label">成员身份</span><select class="field-select" name="identity" required>${renderSelectOptions(options.identities, member.identity, dictionaries.identities)}</select></label>
-            <label class="field-group"><span class="field-label">成员状态</span><select class="field-select" name="memberStatus" required>${renderSelectOptions(options.memberStatuses.filter((status) => !["retired", "disabled"].includes(status)), member.memberStatus, dictionaries.memberStatuses)}</select></label>
           </div>
           <div class="field-grid">
             <label class="field-group"><span class="field-label">部门</span><select class="field-select" name="departments" required>${renderSelectOptions(options.departments, member.departments[0] || "")}</select></label>
@@ -643,7 +643,6 @@ export function renderRegistrationReviewModal() {
           </div>
           <div class="field-grid-3">
             <label class="field-group"><span class="field-label">成员身份</span><select class="field-select" name="identity" required>${renderSelectOptions(options.identities, "seedling", dictionaries.identities)}</select></label>
-            <label class="field-group"><span class="field-label">状态</span><select class="field-select" name="memberStatus" required>${renderSelectOptions(options.memberStatuses.filter((status) => !["retired", "disabled"].includes(status)), "normal", dictionaries.memberStatuses)}</select></label>
           </div>
           <div class="field-grid">
             <label class="field-group"><span class="field-label">部门</span><select class="field-select" name="departments" required>${renderSelectOptions(options.departments, pendingMember.departments[0] || options.departments[0])}</select></label>
@@ -749,7 +748,7 @@ export function renderTaskOwnerReassignModal() {
               ${candidateParticipants.length ? candidateParticipants.map((entry) => `<option value="${entry.member.id}" ${state.modal.nextOwnerId === entry.member.id ? "selected" : ""}>${escapeHtml(entry.member.name)} · ${escapeHtml(entry.participant.role)}</option>`).join("") : '<option value="">当前没有可改派的候选成员</option>'}
             </select>
           </label>
-          ${!candidateParticipants.length ? '<div class="helper-text">请先在任务编辑中添加至少一位正常状态的协作者，再执行负责人改派。</div>' : ""}
+          ${!candidateParticipants.length ? '<div class="helper-text">请先在任务编辑中添加至少一位可参与任务的协作者，再执行负责人改派。</div>' : ""}
           <div class="button-row">
             <button class="button-primary" type="submit" ${candidateParticipants.length ? "" : "disabled"}>确认改派</button>
             <button class="button-ghost" type="button" data-action="close-overlay">取消</button>

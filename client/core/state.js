@@ -36,13 +36,6 @@ export const dictionaries = {
     seedling: "seedling",
     teacher: "teacher",
   },
-  memberStatuses: {
-    pending_review: "待审核",
-    normal: "正常",
-    retired: "已退休",
-    disabled: "已停用",
-    exited: "已退出",
-  },
   taskStatuses: {
     todo: "待开始",
     in_progress: "进行中",
@@ -118,7 +111,6 @@ export const options = {
   difficulties: Object.keys(dictionaries.difficulties),
   roles: Object.keys(dictionaries.roles),
   identities: Object.keys(dictionaries.identities),
-  memberStatuses: Object.keys(dictionaries.memberStatuses),
 };
 
 export const routes = [
@@ -163,7 +155,6 @@ const DEFAULT_MEMBER_FILTERS = {
   role: "all",
   department: "all",
   robotGroup: "all",
-  status: "all",
 };
 
 const DEFAULT_FILE_FILTERS = {

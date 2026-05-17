@@ -21,7 +21,7 @@ export function renderDashboardPage() {
         <div><h2>仪表盘</h2><p>快速查看战队近期任务、成员协作分布、积分排行与兵种项目推进情况。</p></div>
       </div>
       <div class="metric-grid">
-        ${renderMetricCard("当前成员数", stats.memberCount, "包含正常状态成员")}
+        ${renderMetricCard("当前成员数", stats.memberCount, "包含当前可见成员")}
         ${renderMetricCard("进行中任务", stats.inProgressCount, "当前正在推进的公开任务与项目任务")}
         ${renderMetricCard("待审核任务", stats.pendingReviewCount, "已提交成果等待审核与结算")}
         ${renderMetricCard("已逾期任务", stats.overdueCount, "截止日期已过且未完成的任务")}
@@ -168,7 +168,6 @@ export function renderMembersPage() {
   const activeMembers = state.database.members.filter((member) => isMemberIncludedInWorkspaceStats(member));
   const leaderCount = activeMembers.filter((member) => ["admin", "leader"].includes(member.role)).length;
   const overloadedCount = getMemberLoads().filter((entry) => entry.loadLevel === "overload").length;
-  const pendingCount = state.database.members.filter((member) => member.memberStatus === "pending_review").length;
   return `
     <section>
       <div class="panel member-board">
@@ -176,13 +175,12 @@ export function renderMembersPage() {
           <div class="member-stage-copy">
             <div class="market-stage-badge">Member Directory</div>
             <h2>成员管理</h2>
-            <p>按身份、部门、兵种和状态查看成员公开资料、负载与贡献数据。具备权限的成员可以维护成员档案。</p>
+            <p>按身份、部门和兵种查看成员公开资料、负载与贡献数据。具备权限的成员可以维护成员档案。</p>
           </div>
           <div class="market-stage-meta">
             ${renderPointPill("成员总数", activeMembers.length)}
             ${renderPointPill("管理与组长", leaderCount)}
             ${renderPointPill("过载成员", overloadedCount)}
-            ${renderPointPill("待审核", pendingCount)}
           </div>
         </div>
         <div class="market-filter-shell">
@@ -190,10 +188,9 @@ export function renderMembersPage() {
             ${renderFilterField("搜索成员", "member", "query", state.memberFilters.query, "text", "搜索姓名、技能、部门")}
             ${renderFilterSelect("权限角色", "member", "role", state.memberFilters.role, options.roles, dictionaries.roles)}
           </div>
-          <div class="field-grid-3">
+          <div class="field-grid">
             ${renderFilterSelect("部门", "member", "department", state.memberFilters.department, options.departments)}
             ${renderFilterSelect("兵种", "member", "robotGroup", state.memberFilters.robotGroup, options.robotGroups)}
-            ${renderFilterSelect("状态", "member", "status", state.memberFilters.status, options.memberStatuses, dictionaries.memberStatuses)}
           </div>
         </div>
         <div class="toolbar-row"><button class="button-ghost" type="button" data-action="export-members-csv">导出 CSV</button><button class="button-secondary ${state.memberView === "cards" ? "is-active" : ""}" type="button" data-action="set-member-view" data-view="cards">卡片</button><button class="button-secondary ${state.memberView === "table" ? "is-active" : ""}" type="button" data-action="set-member-view" data-view="table">表格</button></div>

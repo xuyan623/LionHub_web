@@ -223,7 +223,11 @@ export function isTaskOpenStatus(status) {
 }
 
 export function isMemberIncludedInWorkspaceStats(member) {
-  return Boolean(member) && !isPendingReviewMember(member) && !isRetiredMember(member) && !isDisabledMember(member);
+  return Boolean(member)
+    && !member.hiddenFromDirectory
+    && !isPendingReviewMember(member)
+    && !isRetiredMember(member)
+    && !isDisabledMember(member);
 }
 
 export function isMemberIncludedInRankings(member) {

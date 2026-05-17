@@ -17,17 +17,11 @@ export async function handleMemberForm(form) {
   member.phone = String(formData.get("phone") || "").trim();
   member.identity = String(formData.get("identity") || member.identity);
   member.role = getRoleForIdentity(member.identity);
-  const nextMemberStatus = String(formData.get("memberStatus") || member.memberStatus);
-  if (["retired", "disabled"].includes(nextMemberStatus)) { pushFlash("退休和停用请使用专用操作按钮执行。", "info"); return; }
-  member.memberStatus = nextMemberStatus;
   member.departments = parseList(String(formData.get("departments") || "")).slice(0, 1);
   member.directions = parseList(String(formData.get("directions") || ""));
   member.robotGroups = parseList(String(formData.get("robotGroups") || ""));
   member.skillTags = parseList(String(formData.get("skillTags") || ""));
   member.bio = String(formData.get("bio") || "").trim();
-
-  const user = state.database.users.find((item) => item.memberId === member.id);
-  if (user) user.status = member.memberStatus === "pending_review" ? "pending" : "active";
 
   if (!(await saveDatabase())) return;
   clearModalStack();
@@ -143,9 +137,9 @@ export async function handleRetireForm(form) {
 }
 
 export async function exportMembersCsv() {
-  const rows = [["姓名","成员身份","角色","部门","兵种","技能标签","状态"]];
+  const rows = [["姓名","成员身份","角色","部门","兵种","技能标签"]];
   state.database.members.forEach((m) => {
-    rows.push([m.name, dictionaries.identities[m.identity] || m.identity, dictionaries.roles[m.role] || m.role, m.departments.join(";"), m.robotGroups.join(";"), m.skillTags.join(";"), dictionaries.memberStatuses[m.memberStatus] || m.memberStatus]);
+    rows.push([m.name, dictionaries.identities[m.identity] || m.identity, dictionaries.roles[m.role] || m.role, m.departments.join(";"), m.robotGroups.join(";"), m.skillTags.join(";")]);
   });
   downloadCsv("成员列表.csv", rows);
 }

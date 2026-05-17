@@ -21,13 +21,12 @@ export async function handleRegistrationReview(form) {
   const robotGroup = String(formData.get("robotGroup") || "").trim();
   const department = String(formData.get("departments") || "").trim();
   const identity = String(formData.get("identity") || "seedling").trim();
-  const memberStatus = String(formData.get("memberStatus") || "normal").trim();
   if (!direction || !robotGroup) { pushFlash("请选择方向和兵种组。", "info"); return; }
 
   member.directions = [direction];
   member.robotGroups = [robotGroup];
   if (department) member.departments = [department];
-  member.memberStatus = memberStatus;
+  member.memberStatus = member.memberStatus === "pending_review" ? "normal" : (member.memberStatus || "normal");
   member.identity = identity;
   member.role = getRoleForIdentity(identity);
   member.bio = String(formData.get("bio") || member.bio || "").trim();
@@ -60,7 +59,7 @@ export async function approveJoinRequest(approvalId) {
   const task = getTaskById(approval.targetId);
   const member = getMemberById(approval.submitterId);
   if (!task || !member) return;
-  if (!canMemberBeAddedToTask(member)) { pushFlash("该成员当前状态不能加入任务。", "info"); return; }
+  if (!canMemberBeAddedToTask(member)) { pushFlash("该成员当前不能加入任务。", "info"); return; }
 
   approval.status = "approved";
   approval.approverId = getCurrentMember().id;

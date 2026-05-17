@@ -484,9 +484,8 @@ export function renderMemberTable(members) {
         <td>${escapeHtml(m.skillTags.join("、") || "-")}</td>
         <td>${escapeHtml(dictionaries.loadLevels[load?.loadLevel] || "-")}</td>
         <td>${summary.composite}</td>
-        <td><span class="status-badge status-${escapeAttribute(m.memberStatus)}">${escapeHtml(dictionaries.memberStatuses[m.memberStatus] || m.memberStatus)}</span></td>
       </tr>
     `;
   }).join("");
-  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>姓名</th><th>身份</th><th>角色</th><th>部门</th><th>兵种</th><th>技能</th><th>负载</th><th>综合贡献</th><th>状态</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  return `<div class="table-wrap"><table class="data-table"><thead><tr><th>姓名</th><th>身份</th><th>角色</th><th>部门</th><th>兵种</th><th>技能</th><th>负载</th><th>综合贡献</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
