@@ -584,6 +584,10 @@
   line-height: 1.6;
 }
 
+.expandable-text-wrap {
+  margin-top: 4px;
+}
+
 /* Empty State */
 .empty-state {
   padding: 30px 24px;
@@ -720,16 +724,19 @@
   font-size: 0.88rem;
 }
 
+.expandable-collection,
 .attachment-collection {
   display: grid;
   gap: 12px;
 }
 
+.expandable-details,
 .attachment-expand {
   display: grid;
   gap: 12px;
 }
 
+.expandable-trigger,
 .attachment-expand-trigger {
   list-style: none;
   cursor: pointer;
@@ -743,30 +750,47 @@
   transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
 }
 
+.expandable-trigger::-webkit-details-marker,
 .attachment-expand-trigger::-webkit-details-marker {
   display: none;
 }
 
+.expandable-trigger:hover,
 .attachment-expand-trigger:hover {
   background: rgba(255, 255, 255, 0.07);
   border-color: var(--line-strong);
   color: var(--text);
 }
 
+.expandable-expanded,
 .attachment-expand-expanded {
   display: none;
 }
 
+.expandable-details[open] .expandable-collapsed,
 .attachment-expand[open] .attachment-expand-collapsed {
   display: none;
 }
 
+.expandable-details[open] .expandable-expanded,
 .attachment-expand[open] .attachment-expand-expanded {
   display: inline;
 }
 
+.expandable-content,
 .attachment-expand-content {
   padding-top: 2px;
+}
+
+.expandable-actions,
+.attachment-expand-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.expandable-collapse-button,
+.attachment-collapse-button {
+  padding-inline: 16px;
 }
 
 .selection-stack {

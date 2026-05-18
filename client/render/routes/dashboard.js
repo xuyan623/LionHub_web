@@ -4,7 +4,7 @@ export function render() {
 
 import { state } from "../../core/state.js";
 import { getCurrentUserTaskRecords, getDashboardFeaturedTasks, getDashboardStats, getDepartmentContribution, getLeaderboard, getMemberLoads } from "../../domain/query.js";
-import { renderChartRow, renderEmpty, renderLoadRow, renderMetricCard, renderPointPill, renderProjectCard, renderRankingRow, renderTaskCard } from "../components.js";
+import { renderChartRow, renderExpandableCollection, renderLoadRow, renderMetricCard, renderPointPill, renderProjectCard, renderRankingRow, renderTaskCard } from "../components.js";
 
 export function renderDashboardPage() {
   const stats = getDashboardStats();
@@ -29,21 +29,45 @@ export function renderDashboardPage() {
       <div class="page-grid columns-3">
         <section class="panel">
           <div class="section-header"><div><h3>我的任务</h3><p>当前用户负责、参与或待提交的任务。</p></div><button class="button-ghost" type="button" data-action="navigate" data-route="myTasks">查看全部</button></div>
-          <div class="task-stack">${myTasks.length ? myTasks.map(({ task }) => renderTaskCard(task, { compact: true })).join("") : renderEmpty("当前没有进行中的个人任务。")}</div>
+          ${renderExpandableCollection(myTasks, ({ task }) => renderTaskCard(task, { compact: true }), {
+            emptyText: "当前没有进行中的个人任务。",
+            listClass: "task-stack",
+            previewLimit: 3,
+            itemUnit: "个",
+            itemLabel: "任务",
+          })}
         </section>
         <section class="panel">
           <div class="section-header"><div><h3>任务市场精选</h3><p>只展示当前仍需跟进的公开任务，已完成任务不会继续占用精选位。</p></div><button class="button-ghost" type="button" data-action="navigate" data-route="market">进入市场</button></div>
-          <div class="task-stack">${featuredTasks.map((task) => renderTaskCard(task, { showAction: true, compact: true })).join("")}</div>
+          ${renderExpandableCollection(featuredTasks, (task) => renderTaskCard(task, { showAction: true, compact: true }), {
+            emptyText: "当前没有可展示任务。",
+            listClass: "task-stack",
+            previewLimit: 3,
+            itemUnit: "个",
+            itemLabel: "任务",
+          })}
         </section>
         <section class="panel">
           <div class="section-header"><div><h3>积分排行</h3><p>综合贡献 Top 5。</p></div><button class="button-ghost" type="button" data-action="navigate" data-route="rankings">完整榜单</button></div>
-          <div class="ranking-stack">${ranking.map((entry, index) => renderRankingRow(entry, index + 1)).join("")}</div>
+          ${renderExpandableCollection(ranking, (entry, index) => renderRankingRow(entry, index + 1), {
+            emptyText: "暂无排行数据。",
+            listClass: "ranking-stack",
+            previewLimit: 3,
+            itemUnit: "名",
+            itemLabel: "成员",
+          })}
         </section>
       </div>
       <div class="page-grid columns-2">
         <section class="panel">
           <div class="section-header"><div><h3>成员负载</h3><p>帮助大家了解当前协作分布与任务压力。</p></div></div>
-          <div class="member-stack">${loads.map((entry) => renderLoadRow(entry)).join("")}</div>
+          ${renderExpandableCollection(loads, (entry) => renderLoadRow(entry), {
+            emptyText: "当前没有负载数据。",
+            listClass: "member-stack",
+            previewLimit: 4,
+            itemUnit: "名",
+            itemLabel: "成员",
+          })}
         </section>
         <section class="panel">
           <div class="section-header"><div><h3>部门贡献</h3><p>按研习点、工时点、管理点合计贡献值比较。</p></div></div>

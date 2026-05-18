@@ -69,6 +69,18 @@ document.addEventListener("click", async (event) => {
     return;
   }
 
+  if (action === "toggle-text-expand") {
+    const wrap = actionTarget.closest(".expandable-text-wrap");
+    if (!wrap) return;
+    const clamp = wrap.querySelector(".expandable-text-clamp");
+    const full = wrap.querySelector(".expandable-text-full");
+    if (!clamp || !full) return;
+    const isExpanded = full.style.display !== "none";
+    clamp.style.display = isExpanded ? "block" : "none";
+    full.style.display = isExpanded ? "none" : "block";
+    return;
+  }
+
   if (action === "dismiss-flash") {
     state.flash = "";
     if (state.flashTimer) clearTimeout(state.flashTimer);

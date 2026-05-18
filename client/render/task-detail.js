@@ -5,7 +5,7 @@ import { toArray, joinOr } from "../core/utils.js";
 import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecords, getActiveParticipantCount, getJoinActionLabel } from "../domain/query.js";
 import { canEditTask, canDeleteAllGeneratedData, canInteractWithTasks, isAdmin, isRetiredMember, isDisabledMember, canMemberBeAddedToTask, canDeleteTaskGeneratedData } from "../domain/permissions.js";
 import { getTaskMaterialAttachments } from "../domain/task.js";
-import { renderStatusBadge, renderPointPill, renderEmpty, renderCommentCard, renderAttachmentCard, renderAttachmentList, renderParticipantRow, renderTaskCard, renderProgressNodeCard } from "./components.js";
+import { renderStatusBadge, renderPointPill, renderEmpty, renderCommentCard, renderAttachmentCard, renderAttachmentList, renderExpandableCollection, renderParticipantRow, renderTaskCard, renderProgressNodeCard } from "./components.js";
 
 export function renderTaskManageBody(tasks) {
   if (state.taskManageView === "table") return renderTaskTable(tasks);
@@ -155,7 +155,13 @@ export function renderTaskDetail(task) {
       </div>
       <section class="panel">
         <div class="section-header"><div><h3>进度节点</h3><p>每个带有进度说明或附件的里程碑记录。</p></div></div>
-        <div class="comment-list">${(task.progressNodes || []).length ? [...task.progressNodes].sort((a, b) => b.percent - a.percent).map((node) => renderProgressNodeCard(node, task.id)).join("") : renderEmpty("还没有进度节点记录。")}</div>
+        ${renderExpandableCollection([...(task.progressNodes || [])].sort((a, b) => b.percent - a.percent), (node) => renderProgressNodeCard(node, task.id), {
+          emptyText: "还没有进度节点记录。",
+          listClass: "comment-list",
+          previewLimit: 3,
+          itemUnit: "条",
+          itemLabel: "进度节点",
+        })}
       </section>
       <section class="panel">
         <div class="section-header"><div><h3>任务资料</h3><p>这里只展示任务共享资料，不包含审核材料。</p></div></div>
@@ -163,11 +169,23 @@ export function renderTaskDetail(task) {
       </section>
       <section class="panel">
         <div class="section-header"><div><h3>参与成员</h3><p>显示负责人、协作者与退出记录。</p></div></div>
-        <div class="member-stack">${participants.map((participant) => renderParticipantRow(participant)).join("")}</div>
+        ${renderExpandableCollection(participants, (participant) => renderParticipantRow(participant), {
+          emptyText: "当前没有参与成员。",
+          listClass: "member-stack",
+          previewLimit: 4,
+          itemUnit: "名",
+          itemLabel: "成员",
+        })}
       </section>
       <section class="panel">
         <div class="section-header"><div><h3>评论与成果</h3><p>任务讨论、进度更新与成果提交记录。</p></div></div>
-        <div class="comment-list">${(task.comments || []).length ? task.comments.map((comment) => renderCommentCard(comment, task.id)).join("") : renderEmpty("还没有评论记录。")}</div>
+        ${renderExpandableCollection(task.comments || [], (comment) => renderCommentCard(comment, task.id), {
+          emptyText: "还没有评论记录。",
+          listClass: "comment-list",
+          previewLimit: 3,
+          itemUnit: "条",
+          itemLabel: "评论",
+        })}
       </section>
       ${canInteractWithTasks() ? renderTaskActionPanel(task, isParticipant) : renderTaskReadOnlyNotice(task)}
       ${canDeleteAllGeneratedData() ? renderRatioPanel(task, participants) : ""}

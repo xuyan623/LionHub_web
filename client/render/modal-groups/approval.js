@@ -4,7 +4,7 @@ import { formatDateTime } from "../../core/format.js";
 import { getApprovalById, getCurrentUser, getLifecycleActionDefinition, getMemberById, getTaskById } from "../../domain/query.js";
 import { getLatestSubmissionSummary, getTaskReviewAttachments, getTaskSettlementPreview } from "../../domain/task.js";
 import { canDeleteApprovalRecord, canReview, getLifecycleBlockingTasks } from "../../domain/permissions.js";
-import { renderAttachmentCard, renderAttachmentList, renderEmpty, renderPointPill, renderSelectOptions, renderTimelineCard } from "../components.js";
+import { renderAttachmentCard, renderAttachmentList, renderEmpty, renderExpandableCollection, renderPointPill, renderSelectOptions, renderTimelineCard } from "../components.js";
 import { joinOr } from "../../core/utils.js";
 
 export function render(modalType) {
@@ -53,7 +53,13 @@ export function renderSensitiveActionModal() {
         ${blockers.length ? `
           <section class="panel">
             <div class="section-header"><div><h3>当前仍有关联任务</h3><p>这类操作会被阻塞。请先进入任务详情调整负责人或参与成员，再回来执行。</p></div></div>
-            <div class="timeline-grid">${blockers.map((task) => renderTimelineCard(task.title, `${dictionaries.taskStatuses[task.status] || task.status} · 负责人 ${getMemberById(task.ownerId)?.name || "未设置"}`)).join("")}</div>
+            ${renderExpandableCollection(blockers, (task) => renderTimelineCard(task.title, `${dictionaries.taskStatuses[task.status] || task.status} · 负责人 ${getMemberById(task.ownerId)?.name || "未设置"}`), {
+              emptyText: "当前没有关联任务。",
+              listClass: "timeline-grid",
+              previewLimit: 3,
+              itemUnit: "条",
+              itemLabel: "记录",
+            })}
           </section>
         ` : ""}
         <form class="auth-form" data-form="sensitive-action">
@@ -388,10 +394,6 @@ function renderSettlementPreviewPanel(task, settlementPreview) {
     return "";
   }
 
-  const participantCards = settlementPreview.memberSettlements
-    .map((entry) => renderSettlementPreviewCard(entry))
-    .join("");
-
   return `
     <section class="panel">
       <div class="section-header">
@@ -410,9 +412,13 @@ function renderSettlementPreviewPanel(task, settlementPreview) {
         ${escapeHtml(`中途加入折扣 ${settlementPreview.middleJoinDiscount}x`)}
         ${settlementPreview.wasOverdue ? ` · ${escapeHtml(`逾期折扣 ${settlementPreview.overdueDiscount}x`)}` : ""}
       </div>
-      <div class="comment-list" style="margin-top:16px">
-        ${participantCards || renderEmpty("当前没有可结算的参与成员。")}
-      </div>
+      ${renderExpandableCollection(settlementPreview.memberSettlements, (entry) => renderSettlementPreviewCard(entry), {
+        emptyText: "当前没有可结算的参与成员。",
+        listClass: "comment-list",
+        previewLimit: 3,
+        itemUnit: "名",
+        itemLabel: "成员",
+      })}
     </section>
   `;
 }

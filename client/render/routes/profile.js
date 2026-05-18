@@ -5,7 +5,7 @@ export function render() {
 import { dictionaries } from "../../core/state.js";
 import { getCurrentMember, getCurrentUserTaskRecords, getMemberPointSummary, getMemberTimeline } from "../../domain/query.js";
 import { canRequestRoleChange, getMemberPendingRoleChange } from "../../domain/permissions.js";
-import { renderEmpty, renderMetricCard, renderTaskCard, renderTimelineCard } from "../components.js";
+import { renderExpandableCollection, renderMetricCard, renderTaskCard, renderTimelineCard } from "../components.js";
 
 export function renderProfilePage() {
   const member = getCurrentMember();
@@ -50,14 +50,26 @@ export function renderProfilePage() {
       <div class="page-grid columns-2">
         <section class="panel">
           <div class="section-header"><div><h3>成长与记录</h3><p>晋升、补偿点、退出任务与逾期任务会统一进入个人时间线。</p></div></div>
-          <div class="timeline-grid">${history.length ? history.map((item) => renderTimelineCard(item.title, item.description)).join("") : renderEmpty("暂无成长记录。")}</div>
+          ${renderExpandableCollection(history, (item) => renderTimelineCard(item.title, item.description), {
+            emptyText: "暂无成长记录。",
+            listClass: "timeline-grid",
+            previewLimit: 4,
+            itemUnit: "条",
+            itemLabel: "记录",
+          })}
         </section>
         <section class="panel">
           <div class="section-header"><div><h3>当前任务快照</h3><p>快速查看正在进行和最近完成的任务。</p></div></div>
-          <div class="task-stack">
-            ${tasks.active.length ? tasks.active.slice(0, 3).map(({ task }) => renderTaskCard(task, { compact: true })).join("") : renderEmpty("暂无进行中的任务。")}
-            ${tasks.completed.length ? tasks.completed.slice(0, 2).map(({ task }) => renderTaskCard(task, { compact: true })).join("") : ""}
-          </div>
+          ${renderExpandableCollection([
+            ...tasks.active.slice(0, 3).map(({ task }) => task),
+            ...tasks.completed.slice(0, 2).map(({ task }) => task),
+          ], (task) => renderTaskCard(task, { compact: true }), {
+            emptyText: "暂无进行中的任务。",
+            listClass: "task-stack",
+            previewLimit: 3,
+            itemUnit: "个",
+            itemLabel: "任务",
+          })}
         </section>
       </div>
       <div class="button-row" style="margin-top:24px;justify-content:flex-start">

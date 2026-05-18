@@ -2,7 +2,7 @@ import { state } from "../../core/state.js";
 import { escapeAttribute, escapeHtml } from "../../core/security.js";
 import { getCurrentMember, getCurrentUser, getLifecycleActionDefinition, getMemberById } from "../../domain/query.js";
 import { canDeleteAllGeneratedData, getLifecycleBlockingTasks } from "../../domain/permissions.js";
-import { renderMemberDetail, renderTimelineCard } from "../components.js";
+import { renderExpandableCollection, renderMemberDetail, renderTimelineCard } from "../components.js";
 
 export function render(modalType) {
   switch (modalType) {
@@ -59,7 +59,13 @@ export function renderMemberFormModal() {
         ${blockingTasks.length ? `
           <section class="panel">
             <div class="section-header"><div><h3>生命周期操作前置提醒</h3><p>当前成员仍有关联中的任务。强制退休或停用前，必须先完成负责人改派或移除参与关系。</p></div></div>
-            <div class="timeline-grid">${blockingTasks.map((task) => renderTimelineCard(task.title, `${escapeHtml(task.status)} · 负责人 ${escapeHtml(getMemberById(task.ownerId)?.name || "未设置")}`)).join("")}</div>
+            ${renderExpandableCollection(blockingTasks, (task) => renderTimelineCard(task.title, `${escapeHtml(task.status)} · 负责人 ${escapeHtml(getMemberById(task.ownerId)?.name || "未设置")}`), {
+              emptyText: "当前没有关联任务。",
+              listClass: "timeline-grid",
+              previewLimit: 3,
+              itemUnit: "条",
+              itemLabel: "记录",
+            })}
           </section>
         ` : ""}
         <form class="auth-form" data-form="member-form">

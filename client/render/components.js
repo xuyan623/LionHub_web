@@ -7,6 +7,7 @@ import { canReview, canDeleteAllGeneratedData, canDeleteTaskGeneratedData, canIn
 import { getLatestSubmissionSummary } from "../domain/task.js";
 
 const ATTACHMENT_PREVIEW_LIMIT = 3;
+const DEFAULT_COLLAPSIBLE_PREVIEW_LIMIT = 3;
 
 export function renderSelectOptions(values, selectedValue = "", labels = null) {
   return values.map((value) => {
@@ -161,7 +162,13 @@ export function renderProjectCard(project, expanded = false) {
         ${renderSubProgress("算法", project.algorithmProgress)}
       </div>
       <div class="comment-card"><strong>当前阻塞项</strong><p>${escapeHtml(project.blocker)}</p></div>
-      <div class="task-stack">${relatedTasks.map((task) => renderTaskCard(task, { compact: true })).join("")}</div>
+      ${renderExpandableCollection(relatedTasks, (task) => renderTaskCard(task, { compact: true }), {
+        emptyText: "当前没有关联任务。",
+        listClass: "task-stack",
+        previewLimit: 2,
+        itemUnit: "个",
+        itemLabel: "任务",
+      })}
     </div>
   `;
 }
@@ -325,6 +332,38 @@ export function renderCommentCard(comment, taskId = "") {
   `;
 }
 
+export function renderExpandableText(text, options = {}) {
+  const { maxLines = 6, maxChars = 300 } = options;
+  const normalizedText = String(text || "").trimEnd();
+  if (!normalizedText) return "";
+
+  const lines = normalizedText.split("\n");
+  const needsClamp = lines.length > maxLines || normalizedText.length > maxChars;
+
+  if (!needsClamp) {
+    return `<p style="white-space:pre-wrap;margin:0">${escapeHtml(normalizedText)}</p>`;
+  }
+
+  let previewLines = lines.slice(0, maxLines);
+  let previewText = previewLines.join("\n");
+  if (previewText.length > maxChars) {
+    previewText = previewText.slice(0, maxChars);
+  }
+
+  return `
+    <div class="expandable-text-wrap">
+      <div class="expandable-text-clamp">
+        <p style="white-space:pre-wrap;margin:0">${escapeHtml(previewText)}…</p>
+        <button class="button-ghost" type="button" data-action="toggle-text-expand" style="min-height:32px;padding:4px 12px;font-size:0.85rem;margin-top:6px">展开全文</button>
+      </div>
+      <div class="expandable-text-full" style="display:none">
+        <p style="white-space:pre-wrap;margin:0">${escapeHtml(normalizedText)}</p>
+        <button class="button-ghost" type="button" data-action="toggle-text-expand" style="min-height:32px;padding:4px 12px;font-size:0.85rem;margin-top:6px">收起</button>
+      </div>
+    </div>
+  `;
+}
+
 export function renderProgressNodeCard(node, taskId = "") {
   const author = getMemberById(node.authorId);
   const canDelete = taskId && canDeleteTaskGeneratedData(getTaskById(taskId), node.authorId);
@@ -334,8 +373,14 @@ export function renderProgressNodeCard(node, taskId = "") {
         <strong>进度节点 · ${node.percent}% · ${escapeHtml(author?.name || "未知成员")}</strong>
         ${canDelete ? `<button class="button-danger" type="button" data-action="delete-progress-node" data-task-id="${taskId}" data-node-id="${node.id}" style="padding:4px 10px;font-size:0.8rem">删除记录</button>` : ""}
       </div>
-      ${node.note ? `<p>${escapeHtml(node.note)}</p>` : ""}
-      ${node.attachments?.length ? `<div class="comment-list">${node.attachments.map((attachment) => renderProgressNodeAttachmentCard(attachment, taskId, node.id, canDelete)).join("")}</div>` : ""}
+      ${node.note ? renderExpandableText(node.note) : ""}
+      ${node.attachments?.length ? renderExpandableCollection(node.attachments, (attachment) => renderProgressNodeAttachmentCard(attachment, taskId, node.id, canDelete), {
+        emptyText: "当前没有附件。",
+        listClass: "comment-list",
+        previewLimit: 3,
+        itemUnit: "个",
+        itemLabel: "附件",
+      }) : ""}
       <div class="helper-text">${formatDateTime(node.createdAt)}</div>
     </div>
   `;
@@ -367,6 +412,44 @@ function sortAttachmentsNewestFirst(attachments = []) {
   });
 }
 
+export function renderExpandableCollection(items, renderItem, options = {}) {
+  const {
+    emptyText = "当前没有内容。",
+    listClass = "comment-list",
+    previewLimit = DEFAULT_COLLAPSIBLE_PREVIEW_LIMIT,
+    itemUnit = "项",
+    itemLabel = "内容",
+  } = options;
+  const entries = Array.isArray(items) ? items : [];
+  if (!entries.length) {
+    return renderEmpty(emptyText);
+  }
+
+  const previewEntries = entries.slice(0, previewLimit);
+  const hiddenEntries = entries.slice(previewLimit);
+  const renderList = (entriesToRender, extraClass = "") => `<div class="${listClass}${extraClass ? ` ${extraClass}` : ""}">${entriesToRender.map(renderItem).join("")}</div>`;
+
+  if (!hiddenEntries.length) {
+    return renderList(previewEntries);
+  }
+
+  return `
+    <div class="expandable-collection">
+      ${renderList(previewEntries)}
+      <details class="expandable-details">
+        <summary class="expandable-trigger">
+          <span class="expandable-collapsed">展开其余 ${hiddenEntries.length} ${itemUnit}${itemLabel}</span>
+          <span class="expandable-expanded">已展开其余 ${hiddenEntries.length} ${itemUnit}${itemLabel}</span>
+        </summary>
+        ${renderList(hiddenEntries, "expandable-content")}
+        <div class="expandable-actions">
+          <button class="button-ghost expandable-collapse-button" type="button" onclick="this.closest('details').open = false">收起${itemLabel}</button>
+        </div>
+      </details>
+    </div>
+  `;
+}
+
 export function renderAttachmentCard(attachment, taskId = "") {
   const attachmentName = attachment.name || "附件资料";
   const attachmentUrl = attachment.url ? `${attachment.url}${attachment.url.includes("?") ? "&" : "?"}downloadName=${encodeURIComponent(attachmentName)}` : "#";
@@ -382,31 +465,13 @@ export function renderAttachmentCard(attachment, taskId = "") {
 }
 
 export function renderAttachmentList(attachments, renderAttachment, emptyText = "当前没有附件。") {
-  const orderedAttachments = sortAttachmentsNewestFirst(attachments || []);
-  if (!orderedAttachments.length) {
-    return renderEmpty(emptyText);
-  }
-
-  const previewAttachments = orderedAttachments.slice(0, ATTACHMENT_PREVIEW_LIMIT);
-  const hiddenAttachments = orderedAttachments.slice(ATTACHMENT_PREVIEW_LIMIT);
-
-  return `
-    <div class="attachment-collection">
-      <div class="comment-list">${previewAttachments.map(renderAttachment).join("")}</div>
-      ${hiddenAttachments.length ? `
-        <details class="attachment-expand">
-          <summary class="attachment-expand-trigger">
-            <span class="attachment-expand-collapsed">展开其余 ${hiddenAttachments.length} 个附件</span>
-            <span class="attachment-expand-expanded">收起其余 ${hiddenAttachments.length} 个附件</span>
-          </summary>
-          <div class="comment-list attachment-expand-content">${hiddenAttachments.map(renderAttachment).join("")}</div>
-          <div class="attachment-expand-actions">
-            <button class="button-ghost attachment-collapse-button" type="button" onclick="this.closest('details').open = false">收起附件</button>
-          </div>
-        </details>
-      ` : ""}
-    </div>
-  `;
+  return renderExpandableCollection(sortAttachmentsNewestFirst(attachments || []), renderAttachment, {
+    emptyText,
+    listClass: "comment-list",
+    previewLimit: ATTACHMENT_PREVIEW_LIMIT,
+    itemUnit: "个",
+    itemLabel: "附件",
+  });
 }
 
 function resolveAttachmentSourceLabel(attachment) {

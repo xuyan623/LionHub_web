@@ -5,7 +5,7 @@ import { getDraftKey, loadDraft } from "../../core/drafts.js";
 import { getActiveParticipantCount, getCurrentMember, getMemberById, getTaskById, getTaskParticipantRecords } from "../../domain/query.js";
 import { getTaskMaterialAttachments } from "../../domain/task.js";
 import { canDeleteAllGeneratedData, canDeleteTask, canDeleteTaskGeneratedData, canEditTask, canMemberBeAddedToTask } from "../../domain/permissions.js";
-import { renderAttachmentCard, renderAttachmentList, renderEmpty, renderMemberDetail, renderMultiSelectOptions, renderPointPill, renderSelectOptions, renderTaskCard, renderTimelineCard } from "../components.js";
+import { renderAttachmentCard, renderAttachmentList, renderEmpty, renderExpandableCollection, renderMemberDetail, renderMultiSelectOptions, renderPointPill, renderSelectOptions, renderTaskCard, renderTimelineCard } from "../components.js";
 import { renderTaskDetail } from "../task-detail.js";
 import { joinOr, toArray } from "../../core/utils.js";
 
@@ -255,7 +255,13 @@ function renderTaskParticipantManagementSection(task) {
       </form>
       ${seatsRemaining === 0 ? '<div class="helper-text">当前任务人数已满。如需新增成员，请先提高人数上限或移除现有协作者。</div>' : ""}
       ${!candidateMembers.length && seatsRemaining > 0 ? '<div class="helper-text">当前没有符合条件的新成员。待审核、退休、停用或指导老师账号不会出现在可加入列表中。</div>' : ""}
-      <div class="member-stack">${activeParticipants.map((participant) => renderTaskEditParticipantRow(task, participant)).join("")}</div>
+      ${renderExpandableCollection(activeParticipants, (participant) => renderTaskEditParticipantRow(task, participant), {
+        emptyText: "当前没有参与成员。",
+        listClass: "member-stack",
+        previewLimit: 4,
+        itemUnit: "名",
+        itemLabel: "成员",
+      })}
     </section>
   `;
 }
