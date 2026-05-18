@@ -223,6 +223,10 @@
   color: var(--text);
 }
 
+.field-textarea {
+  min-height: 80px;
+}
+
 .share-textarea {
   min-height: 380px;
   font-family: "SF Mono", "Consolas", monospace;

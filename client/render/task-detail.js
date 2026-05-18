@@ -132,8 +132,8 @@ export function renderTaskDetail(task) {
             <span class="mini-pill">${escapeHtml(dictionaries.difficulties[task.difficulty])}</span>
           </div>
           <h3>${escapeHtml(task.title)}</h3>
-          <label class="field-group"><span class="field-label">任务描述</span><textarea class="field-textarea" readonly style="resize:none;min-height:100px" onclick="this.select()">${escapeHtml(task.description)}</textarea></label>
-          ${task.acceptanceCriteria ? `<label class="field-group" style="margin-top:16px"><span class="field-label">验收标准</span><textarea class="field-textarea" readonly style="resize:none;min-height:80px" onclick="this.select()">${escapeHtml(task.acceptanceCriteria)}</textarea></label>` : ""}
+          <label class="field-group"><span class="field-label">任务描述</span><textarea class="field-textarea" readonly style="resize:none" onclick="this.select()">${escapeHtml(task.description)}</textarea></label>
+          ${task.acceptanceCriteria ? `<label class="field-group" style="margin-top:16px"><span class="field-label">验收标准</span><textarea class="field-textarea" readonly style="resize:none" onclick="this.select()">${escapeHtml(task.acceptanceCriteria)}</textarea></label>` : ""}
         </div>
       </div>
       <div class="definition-list">

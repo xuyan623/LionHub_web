@@ -19,12 +19,13 @@ echo "[2] 覆盖式拉取到本地"
 echo "[3] 仅上传 /data 目录"
 echo "[4] 同步（拉代码后回传 /data）"
 echo "[5] 开启内网"
-echo "[6] 开启穿透"
-echo "[7] 查看穿透日志"
-echo "[8] 关闭穿透"
+echo "[6] 关闭内网"
+echo "[7] 开启穿透"
+echo "[8] 查看穿透日志"
+echo "[9] 关闭穿透"
 echo "[0] 退出"
 echo ""
-read -r -p "请选择操作 [0-8]: " choice
+read -r -p "请选择操作 [0-9]: " choice
 
 case "$choice" in
   1) run_command "force_push_git.sh" ;;
@@ -32,9 +33,10 @@ case "$choice" in
   3) run_command "upload_database_only.sh" ;;
   4) run_command "sync_release.sh" ;;
   5) run_command "start_lan.sh" ;;
-  6) run_command "start_tunnel.sh" ;;
-  7) run_command "tail_tunnel_log.sh" ;;
-  8) run_command "stop_tunnel.sh" ;;
+  6) run_command "stop_lan.sh" ;;
+  7) run_command "start_tunnel.sh" ;;
+  8) run_command "tail_tunnel_log.sh" ;;
+  9) run_command "stop_tunnel.sh" ;;
   0)
     echo "[i] 已退出"
     ;;
