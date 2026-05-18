@@ -292,7 +292,6 @@ function ensureCompletionApproval(task, comment, attachments = []) {
     submitterId: getCurrentMember().id, approverId: null, status: "pending",
     comment, createdAt: new Date().toISOString(), reviewedAt: null,
     attachments,
-    reviewAttachmentsBound: true,
   });
 }
 
@@ -310,10 +309,6 @@ export function getTaskMaterialAttachments(task) {
   return (task.attachments || []).filter(isTaskMaterialAttachment);
 }
 
-function isLegacyReviewAttachment(attachment) {
-  return Boolean(attachment) && !isTaskMaterialAttachment(attachment);
-}
-
 function cloneTaskMaterialAsReviewAttachment(attachment) {
   return {
     ...attachment,
@@ -323,14 +318,8 @@ function cloneTaskMaterialAsReviewAttachment(attachment) {
   };
 }
 
-export function getTaskReviewAttachments(approval, task) {
-  if (approval?.reviewAttachmentsBound) {
-    return approval.attachments || [];
-  }
-  if (Array.isArray(approval?.attachments) && approval.attachments.length) {
-    return approval.attachments;
-  }
-  return (task?.attachments || []).filter(isLegacyReviewAttachment);
+export function getTaskReviewAttachments(approval) {
+  return approval?.attachments || [];
 }
 
 function getCommentTimestamp(comment) {

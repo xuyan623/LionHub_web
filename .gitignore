@@ -6,6 +6,9 @@ __pycache__/
 node_modules/
 dist/
 data/runtime/
+data/*.db-shm
+data/*.db-wal
+data/backups/lion_hub-pre-*.db
 .edge-test-profile/
 edge-dom.html
 logs/

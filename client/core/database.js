@@ -100,21 +100,26 @@ export async function loadDatabase() {
 
 function normalizeDatabaseRoles(database) {
   if (!database || !Array.isArray(database.members)) {
-    return;
+    return false;
   }
+  let changed = false;
   for (const member of database.members) {
     const expectedRole = dictionaries.identityRoleMap[member.identity] || member.role;
     if (member.role !== expectedRole) {
       member.role = expectedRole;
+      changed = true;
     }
   }
+  return changed;
 }
 
 function migrateProgressNodes(database) {
-  if (!database || !Array.isArray(database.tasks)) return;
+  if (!database || !Array.isArray(database.tasks)) return false;
+  let changed = false;
   for (const task of database.tasks) {
     if (!Array.isArray(task.progressNodes)) {
       task.progressNodes = [];
+      changed = true;
     }
     if (!Array.isArray(task.comments)) continue;
     const progressComments = task.comments.filter((comment) => comment.title === "进度更新");
@@ -130,10 +135,13 @@ function migrateProgressNodes(database) {
           createdAt: comment.createdAt,
           authorId: comment.authorId,
         });
+        changed = true;
       }
     }
   }
+  return changed;
 }
+
 
 export async function saveDatabase(database = state.database) {
   try {
@@ -160,9 +168,9 @@ async function synchronizeDatabaseFromServer() {
       return false;
     }
     state.database = snapshot.database;
+    state.databaseVersion = Number(snapshot.version || 0);
     normalizeDatabaseRoles(state.database);
     migrateProgressNodes(state.database);
-    state.databaseVersion = Number(snapshot.version || 0);
     return true;
   } catch (error) {
     console.error("Failed to synchronize database:", error);

@@ -363,7 +363,7 @@ export function renderTaskAttachmentFormModal() {
         <form class="auth-form" data-form="task-attachment-form" data-task-id="${task.id}">
           <label class="field-group"><span class="field-label">选择文件</span><input class="field-input field-file-input" type="file" name="attachments" multiple onchange="this.nextElementSibling.textContent = this.files.length > 5 ? '单次最多上传 5 个文件。' : ''"><span class="helper-text file-count-warn" style="color:var(--danger)"></span></label>
           <div class="modal-actions-sticky">
-            <div class="helper-text">附件会进入任务共享附件区，并出现在任务详情与文件管理中。</div>
+            <div class="helper-text">附件会进入任务资料区，并出现在任务详情与文件管理中。</div>
             <div class="button-row">
               <button class="button-primary" type="submit" ${state.formLoading === "task-attachment-form" ? "disabled" : ""}>上传附件</button>
               <button class="button-ghost" type="button" data-action="close-overlay">取消</button>

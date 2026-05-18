@@ -220,7 +220,7 @@ export function renderApprovalActionModal() {
   const isCompletionApproval = approval.type === "completion";
   const task = isCompletionApproval ? getTaskById(approval.targetId) : null;
   const submissionSummary = task ? getLatestSubmissionSummary(task) : "";
-  const reviewAttachments = task ? getTaskReviewAttachments(approval, task) : [];
+  const reviewAttachments = task ? getTaskReviewAttachments(approval) : [];
   const settlementPreview = task ? getTaskSettlementPreview(task) : null;
   return `
     <div class="modal">

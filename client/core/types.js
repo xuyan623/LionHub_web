@@ -99,7 +99,6 @@
  * @property {string|null} reviewedAt
  * @property {string} [requestedIdentity]
  * @property {Object[]} [attachments]
- * @property {boolean} [reviewAttachmentsBound]
  */
 
 /**

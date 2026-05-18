@@ -400,6 +400,9 @@ export function renderAttachmentList(attachments, renderAttachment, emptyText = 
             <span class="attachment-expand-expanded">收起其余 ${hiddenAttachments.length} 个附件</span>
           </summary>
           <div class="comment-list attachment-expand-content">${hiddenAttachments.map(renderAttachment).join("")}</div>
+          <div class="attachment-expand-actions">
+            <button class="button-ghost attachment-collapse-button" type="button" onclick="this.closest('details').open = false">收起附件</button>
+          </div>
         </details>
       ` : ""}
     </div>
