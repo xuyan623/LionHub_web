@@ -720,6 +720,94 @@
   font-size: 0.88rem;
 }
 
+.attachment-collection {
+  display: grid;
+  gap: 12px;
+}
+
+.attachment-expand {
+  display: grid;
+  gap: 12px;
+}
+
+.attachment-expand-trigger {
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.attachment-expand-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.attachment-expand-trigger:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.attachment-expand-expanded {
+  display: none;
+}
+
+.attachment-expand[open] .attachment-expand-collapsed {
+  display: none;
+}
+
+.attachment-expand[open] .attachment-expand-expanded {
+  display: inline;
+}
+
+.attachment-expand-content {
+  padding-top: 2px;
+}
+
+.selection-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.selection-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+.selection-card input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: white;
+  flex: 0 0 auto;
+}
+
+.selection-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.selection-copy strong {
+  color: var(--text);
+  font-size: 0.95rem;
+}
+
+.selection-copy span {
+  color: var(--text-faint);
+  font-size: 0.84rem;
+}
+
 /* Utility Text */
 .helper-text {
   color: var(--text-faint);

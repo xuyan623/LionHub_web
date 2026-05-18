@@ -247,6 +247,7 @@ export async function handleSubmissionForm(form) {
   if (task.progressPercent < 100) { pushFlash("任务进度必须达到 100% 才能提交成果。", "info"); return; }
   const formData = new FormData(form);
   const summary = String(formData.get("summary") || "").trim();
+  const selectedTaskMaterialIds = new Set(formData.getAll("selectedTaskMaterialIds").map((value) => String(value || "").trim()).filter(Boolean));
   const stagedFiles = Array.isArray(state.modal?.pendingFiles) ? state.modal.pendingFiles : [];
   const selectedFiles = [...stagedFiles, ...getSelectedUploadFiles(formData.getAll("attachments"))];
   if (!summary) { pushFlash("提交成果时必须填写成果说明。", "info"); return; }
@@ -254,20 +255,24 @@ export async function handleSubmissionForm(form) {
   let uploadedAttachments = [];
   if (selectedFiles.length) {
     try {
-      uploadedAttachments = await uploadLocalAttachments(task.id, selectedFiles, "submission");
+      uploadedAttachments = await uploadLocalAttachments(task.id, selectedFiles, "review_material");
     } catch (error) {
       pushFlash(error instanceof Error ? error.message : "附件上传失败，请稍后重试。", "info");
       return;
     }
   }
 
+  const selectedTaskMaterials = getTaskMaterialAttachments(task)
+    .filter((attachment) => selectedTaskMaterialIds.has(attachment.id))
+    .map(cloneTaskMaterialAsReviewAttachment);
+  const reviewAttachments = [...uploadedAttachments, ...selectedTaskMaterials];
+
   task.status = "pending_review";
   task.submittedAt = new Date().toISOString();
   const submitter = getCurrentMember();
   const submissionComment = createComment("成果提交", summary, submitter);
   task.comments.unshift(submissionComment);
-  if (uploadedAttachments.length) replaceSubmissionAttachments(task, uploadedAttachments);
-  ensureCompletionApproval(task, "提交成果等待审核");
+  ensureCompletionApproval(task, "提交成果等待审核", reviewAttachments);
   const owner = getMemberById(task.ownerId);
   if (owner && owner.userId && owner.userId !== submitter.userId) {
     createNotification(owner.userId, `${submitter.name} 提交了《${task.title}》的成果，等待审核`, { sourceId: submissionComment.id, sourceType: "comment", taskId: task.id, memberId: submitter.id, type: "task_review" });
@@ -280,12 +285,14 @@ export async function handleSubmissionForm(form) {
   pushFlash("成果已提交，等待审核。", "info");
 }
 
-function ensureCompletionApproval(task, comment) {
+function ensureCompletionApproval(task, comment, attachments = []) {
   removePendingCompletionApprovals(task.id);
   state.database.approvals.unshift({
     id: uid("approval"), type: "completion", targetId: task.id,
     submitterId: getCurrentMember().id, approverId: null, status: "pending",
     comment, createdAt: new Date().toISOString(), reviewedAt: null,
+    attachments,
+    reviewAttachmentsBound: true,
   });
 }
 
@@ -295,12 +302,35 @@ function removePendingCompletionApprovals(taskId) {
   );
 }
 
-export function isSubmissionAttachment(attachment) {
-  return attachment?.source === "submission";
+export function isTaskMaterialAttachment(attachment) {
+  return attachment?.source === "task_attachment";
 }
 
-export function getSubmissionAttachments(task) {
-  return (task.attachments || []).filter(isSubmissionAttachment);
+export function getTaskMaterialAttachments(task) {
+  return (task.attachments || []).filter(isTaskMaterialAttachment);
+}
+
+function isLegacyReviewAttachment(attachment) {
+  return Boolean(attachment) && !isTaskMaterialAttachment(attachment);
+}
+
+function cloneTaskMaterialAsReviewAttachment(attachment) {
+  return {
+    ...attachment,
+    source: "review_material",
+    reviewMaterialOrigin: "task_attachment",
+    originalAttachmentId: attachment.id,
+  };
+}
+
+export function getTaskReviewAttachments(approval, task) {
+  if (approval?.reviewAttachmentsBound) {
+    return approval.attachments || [];
+  }
+  if (Array.isArray(approval?.attachments) && approval.attachments.length) {
+    return approval.attachments;
+  }
+  return (task?.attachments || []).filter(isLegacyReviewAttachment);
 }
 
 function getCommentTimestamp(comment) {
@@ -325,10 +355,6 @@ export function getLatestSubmissionComment(task) {
 
 export function getLatestSubmissionSummary(task) {
   return getLatestSubmissionComment(task)?.content || "";
-}
-
-function replaceSubmissionAttachments(task, attachments) {
-  task.attachments = [...(task.attachments || []).filter((attachment) => !isSubmissionAttachment(attachment)), ...attachments];
 }
 
 export function appendTaskAttachments(task, attachments) {
@@ -366,6 +392,23 @@ export async function deleteTaskAttachment(taskId, attachmentId) {
   }
   if (!window.confirm(`确认删除附件《${attachment.name}》？删除后不可恢复。`)) return;
   task.attachments = (task.attachments || []).filter((item) => item.id !== attachmentId);
+  state.database.approvals = (state.database.approvals || []).map((approval) => {
+    if (!Array.isArray(approval.attachments) || !approval.attachments.length) {
+      return approval;
+    }
+    return {
+      ...approval,
+      attachments: approval.attachments.filter((item) => {
+        if (item.originalAttachmentId && item.originalAttachmentId === attachment.id) {
+          return false;
+        }
+        if (item.reviewMaterialOrigin === "task_attachment" && item.storagePath && item.storagePath === attachment.storagePath) {
+          return false;
+        }
+        return true;
+      }),
+    };
+  });
   if (!(await saveDatabase())) return;
   await deleteLocalAttachments([attachment]);
   if (state.settingsFiles) {

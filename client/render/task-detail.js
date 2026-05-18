@@ -4,13 +4,18 @@ import { formatDateTime, formatShortDate } from "../core/format.js";
 import { toArray, joinOr } from "../core/utils.js";
 import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecords, getActiveParticipantCount, getJoinActionLabel } from "../domain/query.js";
 import { canEditTask, canDeleteAllGeneratedData, canInteractWithTasks, isAdmin, isRetiredMember, isDisabledMember, canMemberBeAddedToTask, canDeleteTaskGeneratedData } from "../domain/permissions.js";
-import { renderStatusBadge, renderPointPill, renderEmpty, renderCommentCard, renderAttachmentCard, renderParticipantRow, renderTaskCard, renderProgressNodeCard } from "./components.js";
+import { getTaskMaterialAttachments } from "../domain/task.js";
+import { renderStatusBadge, renderPointPill, renderEmpty, renderCommentCard, renderAttachmentCard, renderAttachmentList, renderParticipantRow, renderTaskCard, renderProgressNodeCard } from "./components.js";
 
 export function renderTaskManageBody(tasks) {
   if (state.taskManageView === "table") return renderTaskTable(tasks);
   if (state.taskManageView === "calendar") return renderTaskCalendar(tasks);
   if (state.taskManageView === "robot") return renderTaskRobotView(tasks);
   return renderTaskKanban(tasks);
+}
+
+function getVisibleTaskMaterials(task) {
+  return getTaskMaterialAttachments(task);
 }
 
 function renderTaskKanban(tasks) {
@@ -153,8 +158,8 @@ export function renderTaskDetail(task) {
         <div class="comment-list">${(task.progressNodes || []).length ? [...task.progressNodes].sort((a, b) => b.percent - a.percent).map((node) => renderProgressNodeCard(node, task.id)).join("") : renderEmpty("还没有进度节点记录。")}</div>
       </section>
       <section class="panel">
-        <div class="section-header"><div><h3>附件资料</h3><p>任务资料、成果附件和历史外链都会展示在这里。</p></div></div>
-        <div class="comment-list">${(task.attachments || []).length ? task.attachments.map((attachment) => renderAttachmentCard(attachment, task.id)).join("") : renderEmpty("当前没有附件资料。")}</div>
+        <div class="section-header"><div><h3>任务资料</h3><p>这里只展示任务共享资料，不包含审核材料。</p></div></div>
+        ${renderAttachmentList(getVisibleTaskMaterials(task), (attachment) => renderAttachmentCard(attachment, task.id), "当前没有任务资料。")}
       </section>
       <section class="panel">
         <div class="section-header"><div><h3>参与成员</h3><p>显示负责人、协作者与退出记录。</p></div></div>
@@ -264,5 +269,3 @@ function getReadOnlyTaskActionMessage(member = getCurrentMember()) {
   if (member.role === "teacher") return "指导老师账号仅用于查看，不参与普通任务协作。";
   return "当前账号没有任务操作权限。";
 }
-
-

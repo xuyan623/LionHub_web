@@ -3,9 +3,9 @@ import { escapeAttribute, escapeHtml } from "../../core/security.js";
 import { addDays, formatDateTime, toDateTimeLocalValue } from "../../core/format.js";
 import { getDraftKey, loadDraft } from "../../core/drafts.js";
 import { getActiveParticipantCount, getCurrentMember, getMemberById, getTaskById, getTaskParticipantRecords } from "../../domain/query.js";
-import { getSubmissionAttachments } from "../../domain/task.js";
+import { getTaskMaterialAttachments } from "../../domain/task.js";
 import { canDeleteAllGeneratedData, canDeleteTask, canDeleteTaskGeneratedData, canEditTask, canMemberBeAddedToTask } from "../../domain/permissions.js";
-import { renderAttachmentCard, renderEmpty, renderMemberDetail, renderMultiSelectOptions, renderPointPill, renderSelectOptions, renderTaskCard, renderTimelineCard } from "../components.js";
+import { renderAttachmentCard, renderAttachmentList, renderEmpty, renderMemberDetail, renderMultiSelectOptions, renderPointPill, renderSelectOptions, renderTaskCard, renderTimelineCard } from "../components.js";
 import { renderTaskDetail } from "../task-detail.js";
 import { joinOr, toArray } from "../../core/utils.js";
 
@@ -33,7 +33,7 @@ export function render(modalType) {
 export function renderTaskCompletionModal() {
   const task = getTaskById(state.modal.taskId);
   if (!task) return "";
-  const existingSubmissionAttachments = getSubmissionAttachments(task);
+  const taskMaterialAttachments = getTaskMaterialAttachments(task);
   const stagedProgressFiles = Array.isArray(state.modal.pendingFiles) ? state.modal.pendingFiles : [];
   const initialSummary = typeof state.modal.initialSummary === "string" ? state.modal.initialSummary : "";
   return `
@@ -45,10 +45,25 @@ export function renderTaskCompletionModal() {
         </div>
         <form class="auth-form" data-form="task-submit" data-task-id="${task.id}">
           <label class="field-group"><span class="field-label">成果说明</span><textarea class="field-textarea" name="summary" placeholder="描述完成内容、验收方式与产出结论" required>${escapeHtml(initialSummary)}</textarea></label>
-          <label class="field-group"><span class="field-label">上传附件</span><input class="field-input field-file-input" type="file" name="attachments" multiple onchange="this.nextElementSibling.textContent = this.files.length > 5 ? '单次最多上传 5 个文件。' : ''"><span class="helper-text file-count-warn" style="color:var(--danger)"></span></label>
-          <div class="helper-text">附件会上传到当前任务的共享附件区。可一次选择多个文件；如果本次不重新选择，将保留当前已上传的附件。</div>
-          ${stagedProgressFiles.length ? `<div class="helper-text">当前有 ${stagedProgressFiles.length} 个从"更新进度"带入的附件，会在提交审核时一并上传。</div>` : ""}
-          ${existingSubmissionAttachments.length ? `<div class="attachment-list-inline">${existingSubmissionAttachments.map((attachment) => `<span class="attachment-chip">${escapeHtml(attachment.name || "已上传附件")}</span>`).join("")}</div>` : ""}
+          <label class="field-group"><span class="field-label">上传审核材料</span><input class="field-input field-file-input" type="file" name="attachments" multiple onchange="this.nextElementSibling.textContent = this.files.length > 5 ? '单次最多上传 5 个文件。' : ''"><span class="helper-text file-count-warn" style="color:var(--danger)"></span></label>
+          <div class="helper-text">这里上传的文件只进入本次审核材料，不会混进任务资料区。</div>
+          ${stagedProgressFiles.length ? `<div class="helper-text">当前有 ${stagedProgressFiles.length} 个带入文件，会在提交审核时一并作为审核材料上传。</div>` : ""}
+          ${taskMaterialAttachments.length ? `
+            <div class="field-group">
+              <span class="field-label">勾选任务资料作为审核材料</span>
+              <div class="selection-stack">
+                ${taskMaterialAttachments.map((attachment) => `
+                  <label class="selection-card">
+                    <input type="checkbox" name="selectedTaskMaterialIds" value="${escapeAttribute(attachment.id)}">
+                    <div class="selection-copy">
+                      <strong>${escapeHtml(attachment.name || "任务资料")}</strong>
+                      <span>${escapeHtml(attachment.uploadedByName || "未记录上传者")}</span>
+                    </div>
+                  </label>
+                `).join("")}
+              </div>
+            </div>
+          ` : ""}
           <div class="modal-actions-sticky">
             <div class="helper-text">提交后任务会进入审核流程，期间不再允许继续编辑进度。</div>
             <div class="button-row">
@@ -141,6 +156,7 @@ export function renderTaskFormModal() {
   const editing = Boolean(state.modal.taskId);
   const cloning = Boolean(state.modal.cloneFromTaskId);
   const canDelete = editing && canDeleteTask(task);
+  const taskMaterialAttachments = task ? getTaskMaterialAttachments(task) : [];
   const currentMember = getCurrentMember();
   const draft = loadDraft(getDraftKey("task-form", taskId || ""));
   const d = draft || {};
@@ -206,10 +222,10 @@ export function renderTaskFormModal() {
             </div>
           </div>
         </form>
-        ${editing && (task.attachments || []).length ? `
+        ${editing && taskMaterialAttachments.length ? `
           <section class="panel">
-            <div class="section-header"><div><h3>已有附件</h3><p>${task.attachments.length} 个文件，可逐个删除。</p></div></div>
-            <div class="comment-list">${task.attachments.map((attachment) => renderAttachmentCard(attachment, task.id)).join("")}</div>
+            <div class="section-header"><div><h3>已有任务资料</h3><p>${taskMaterialAttachments.length} 个文件，可逐个删除。</p></div></div>
+            ${renderAttachmentList(taskMaterialAttachments, (attachment) => renderAttachmentCard(attachment, task.id), "当前没有任务资料。")}
           </section>
         ` : ""}
         ${editing ? renderTaskParticipantManagementSection(task) : ""}

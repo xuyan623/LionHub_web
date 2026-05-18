@@ -6,6 +6,8 @@ import { getCurrentMember, getTaskById, getMemberById, getTaskParticipantRecords
 import { canReview, canDeleteAllGeneratedData, canDeleteTaskGeneratedData, canInteractWithTasks, canDeletePointTransaction, canDeleteApprovalRecord, isAdmin, isRetiredMember, isDisabledMember, canMemberBeAddedToTask, getLifecycleBlockingTasks, isTaskOpenStatus } from "../domain/permissions.js";
 import { getLatestSubmissionSummary } from "../domain/task.js";
 
+const ATTACHMENT_PREVIEW_LIMIT = 3;
+
 export function renderSelectOptions(values, selectedValue = "", labels = null) {
   return values.map((value) => {
     const selected = value === selectedValue ? "selected" : "";
@@ -350,6 +352,21 @@ function renderProgressNodeAttachmentCard(attachment, taskId, nodeId, canDelete)
   `;
 }
 
+function getAttachmentTimestamp(attachment) {
+  const timestamp = Date.parse(attachment?.uploadedAt || attachment?.createdAt || "");
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+
+function sortAttachmentsNewestFirst(attachments = []) {
+  return [...attachments].sort((left, right) => {
+    const timeDifference = getAttachmentTimestamp(right) - getAttachmentTimestamp(left);
+    if (timeDifference !== 0) {
+      return timeDifference;
+    }
+    return String(right?.id || "").localeCompare(String(left?.id || ""), "zh-CN");
+  });
+}
+
 export function renderAttachmentCard(attachment, taskId = "") {
   const attachmentName = attachment.name || "附件资料";
   const attachmentUrl = attachment.url ? `${attachment.url}${attachment.url.includes("?") ? "&" : "?"}downloadName=${encodeURIComponent(attachmentName)}` : "#";
@@ -364,12 +381,36 @@ export function renderAttachmentCard(attachment, taskId = "") {
   `;
 }
 
+export function renderAttachmentList(attachments, renderAttachment, emptyText = "当前没有附件。") {
+  const orderedAttachments = sortAttachmentsNewestFirst(attachments || []);
+  if (!orderedAttachments.length) {
+    return renderEmpty(emptyText);
+  }
+
+  const previewAttachments = orderedAttachments.slice(0, ATTACHMENT_PREVIEW_LIMIT);
+  const hiddenAttachments = orderedAttachments.slice(ATTACHMENT_PREVIEW_LIMIT);
+
+  return `
+    <div class="attachment-collection">
+      <div class="comment-list">${previewAttachments.map(renderAttachment).join("")}</div>
+      ${hiddenAttachments.length ? `
+        <details class="attachment-expand">
+          <summary class="attachment-expand-trigger">
+            <span class="attachment-expand-collapsed">展开其余 ${hiddenAttachments.length} 个附件</span>
+            <span class="attachment-expand-expanded">收起其余 ${hiddenAttachments.length} 个附件</span>
+          </summary>
+          <div class="comment-list attachment-expand-content">${hiddenAttachments.map(renderAttachment).join("")}</div>
+        </details>
+      ` : ""}
+    </div>
+  `;
+}
+
 function resolveAttachmentSourceLabel(attachment) {
   const uploader = attachment?.uploadedByName ? ` · ${attachment.uploadedByName}` : "";
-  if (attachment?.source === "submission") return `成果提交附件${uploader}`;
-  if (attachment?.source === "progress") return `进度更新附件${uploader}`;
+  if (attachment?.source === "review_material" || attachment?.source === "submission" || attachment?.source === "progress") return `审核材料${uploader}`;
   if (attachment?.source === "progress_note") return `进度说明附件${uploader}`;
-  if (attachment?.source === "task_attachment") return `任务资料附件${uploader}`;
+  if (attachment?.source === "task_attachment") return `任务资料${uploader}`;
   if (attachment?.source === "promotion") return `转正申请附件${uploader}`;
   return uploader ? `上传者：${attachment.uploadedByName}` : "";
 }

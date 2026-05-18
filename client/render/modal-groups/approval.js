@@ -2,9 +2,9 @@ import { dictionaries, options, state } from "../../core/state.js";
 import { escapeAttribute, escapeHtml } from "../../core/security.js";
 import { formatDateTime } from "../../core/format.js";
 import { getApprovalById, getCurrentUser, getLifecycleActionDefinition, getMemberById, getTaskById } from "../../domain/query.js";
-import { getLatestSubmissionSummary, getSubmissionAttachments, getTaskSettlementPreview } from "../../domain/task.js";
+import { getLatestSubmissionSummary, getTaskReviewAttachments, getTaskSettlementPreview } from "../../domain/task.js";
 import { canDeleteApprovalRecord, canReview, getLifecycleBlockingTasks } from "../../domain/permissions.js";
-import { renderAttachmentCard, renderEmpty, renderPointPill, renderSelectOptions, renderTimelineCard } from "../components.js";
+import { renderAttachmentCard, renderAttachmentList, renderEmpty, renderPointPill, renderSelectOptions, renderTimelineCard } from "../components.js";
 import { joinOr } from "../../core/utils.js";
 
 export function render(modalType) {
@@ -194,7 +194,7 @@ export function renderPromotionDetailModal() {
         </section>
         <section class="panel">
           <div class="section-header"><div><h3>附件资料</h3><p>申请时上传的附件材料。</p></div></div>
-          <div class="comment-list">${(approval.attachments || []).length ? approval.attachments.map((attachment) => renderAttachmentCard(attachment)).join("") : renderEmpty("当前没有上传附件。")}</div>
+          ${renderAttachmentList(approval.attachments || [], (attachment) => renderAttachmentCard(attachment), "当前没有上传附件。")}
         </section>
         <div class="modal-actions-sticky">
           <div class="helper-text">审核通过后，该成员会进入新的成员身份。</div>
@@ -220,7 +220,7 @@ export function renderApprovalActionModal() {
   const isCompletionApproval = approval.type === "completion";
   const task = isCompletionApproval ? getTaskById(approval.targetId) : null;
   const submissionSummary = task ? getLatestSubmissionSummary(task) : "";
-  const submissionAttachments = task ? getSubmissionAttachments(task) : [];
+  const reviewAttachments = task ? getTaskReviewAttachments(approval, task) : [];
   const settlementPreview = task ? getTaskSettlementPreview(task) : null;
   return `
     <div class="modal">
@@ -242,8 +242,8 @@ export function renderApprovalActionModal() {
             <div class="comment-card"><p>${escapeHtml(submissionSummary || "当前没有找到成果说明。")}</p></div>
           </section>
           <section class="panel">
-            <div class="section-header"><div><h3>提交附件</h3><p>如果成员在提交审核时上传了附件，会在这里展示。</p></div></div>
-            <div class="comment-list">${submissionAttachments.length ? submissionAttachments.map((attachment) => renderAttachmentCard(attachment)).join("") : renderEmpty("当前没有提交附件。")}</div>
+            <div class="section-header"><div><h3>审核材料</h3><p>这里只展示本次审核使用的材料，包括新上传附件和勾选进入审核的任务资料。</p></div></div>
+            ${renderAttachmentList(reviewAttachments, (attachment) => renderAttachmentCard(attachment), "当前没有审核材料。")}
           </section>
           ${renderSettlementPreviewPanel(task, settlementPreview)}
         ` : approval.comment ? `<section class="panel"><div class="comment-card"><p>${escapeHtml(approval.comment)}</p></div></section>` : ""}
