@@ -7,7 +7,7 @@ import { getRoleForIdentity, canApproveRoleChange, canRequestRoleChange, canRevi
 import { getCurrentMember, getCurrentUser, getTaskById, getMemberById, getApprovalById, getTaskParticipantRecords } from "./query.js";
 import { pushFlash } from "../core/services.js";
 import { settleTaskPoints } from "./task.js";
-import { createNotification, getParticipantUserIds, getReviewerUserIds, removeNotificationsBySource, removeNotificationsByTask } from "./notifications.js";
+import { createNotification, getParticipantUserIds, getReviewerUserIds, removeNotificationsBySource, removeNotificationsByTask, removeNotificationsByUser } from "./notifications.js";
 
 export async function handleRegistrationReview(form) {
   const formData = new FormData(form);
@@ -256,6 +256,19 @@ export async function deleteApprovalRecord(approvalId) {
   const approval = getApprovalById(approvalId);
   if (!approval || !canDeleteApprovalRecord(approval)) { pushFlash("当前没有权限删除该审核记录。", "info"); return; }
   if (!window.confirm("确认删除这条审核记录？删除后不可恢复。")) return;
+
+  if (approval.type === "registration" && approval.status !== "approved") {
+    const member = getMemberById(approval.targetId);
+    const user = member ? state.database.users.find((u) => u.memberId === member.id) : null;
+    if (user) {
+      removeWhere("users", (item) => item.id === user.id);
+      removeNotificationsByUser(user.id);
+    }
+    if (member) {
+      removeWhere("members", (item) => item.id === member.id);
+    }
+  }
+
   removeWhere("approvals", (item) => item.id === approvalId);
   removeNotificationsBySource("approval", approvalId);
   if (!(await saveDatabase())) return;

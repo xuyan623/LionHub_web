@@ -102,6 +102,7 @@ document.addEventListener("click", async (event) => {
   if (action === "switch-auth") {
     state.authMode = actionTarget.dataset.mode;
     state.authFeedback = "";
+    savePersistentState();
     renderApp();
     return;
   }
@@ -790,6 +791,21 @@ document.addEventListener("change", (event) => {
   const target = event.target;
   if (!isFormField(target)) return;
   clearFieldValidationState(target);
+  const draftForm = target.closest("form[data-draft-key]");
+  if (draftForm) {
+    const draftKey = draftForm.dataset.draftKey;
+    if (draftKey) {
+      saveDraft(draftKey, serializeFormDraft(draftForm));
+    }
+  }
+});
+
+document.addEventListener("focusin", (event) => {
+  const target = event.target;
+  if (target.hasAttribute("data-readonly")) {
+    target.removeAttribute("readonly");
+    target.removeAttribute("data-readonly");
+  }
 });
 
 document.addEventListener("dragenter", (event) => {

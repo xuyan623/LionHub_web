@@ -128,6 +128,7 @@ const PERSISTENT_KEYS = [
   "memberFilters",
   "fileFilters",
   "tableSort",
+  "authMode",
 ];
 
 const DEFAULT_MARKET_FILTERS = {
@@ -202,7 +203,7 @@ export const state = {
   renderCycleVersion: 0,
   currentUserId: null,
   route: "dashboard",
-  authMode: "login",
+  authMode: persisted.authMode ?? "login",
   authFeedback: "",
   initError: "",
   flash: "",

@@ -33,7 +33,7 @@ from backend.files import (
     sanitize_filename,
     sanitize_relative_storage_path,
 )
-from backend.schemas import AttachmentDeletePayload, DatabasePayload, PersistenceConflictError
+from backend.schemas import AttachmentDeletePayload, DatabasePayload, PersistenceConflictError, RegisterPayload
 from backend.store import SharedDatabaseStore
 
 
@@ -226,6 +226,90 @@ def authenticate(payload: AuthPayload, request: Request) -> dict:
     return {
         "userId": user["id"],
         "status": user.get("status", "pending"),
+        "apiKey": api_key,
+    }
+
+
+@app.post("/api/register")
+def register_user(payload: RegisterPayload, request: Request) -> dict:
+    if not _check_rate_limit(_get_client_ip(request)):
+        raise HTTPException(status_code=429, detail="请求过于频繁，请稍后重试。")
+    snapshot = store.load_snapshot()
+    if not snapshot or not snapshot.get("database"):
+        raise HTTPException(status_code=401, detail="系统尚未准备完成，请稍后再试。")
+    database = snapshot["database"]
+
+    email = payload.email.strip().lower()
+    for user in database.get("users", []):
+        if user.get("email", "").lower() == email:
+            raise HTTPException(status_code=400, detail="该邮箱已被注册，请直接登录。")
+
+    from uuid import uuid4
+    from datetime import datetime, timezone
+
+    user_id = f"user_{uuid4().hex[:12]}"
+    member_id = f"member_{uuid4().hex[:12]}"
+    approval_id = f"approval_{uuid4().hex[:12]}"
+    now = datetime.now(timezone.utc).isoformat()
+
+    new_user = {
+        "id": user_id,
+        "memberId": member_id,
+        "username": payload.username.strip(),
+        "email": email,
+        "passwordHash": payload.password,
+        "status": "pending",
+        "createdAt": now,
+        "lastLoginAt": None,
+    }
+
+    new_member = {
+        "id": member_id,
+        "userId": user_id,
+        "name": payload.name.strip(),
+        "avatar": "",
+        "phone": payload.phone.strip(),
+        "identity": "seedling",
+        "role": "member",
+        "departments": [payload.department.strip()],
+        "directions": [],
+        "robotGroups": [],
+        "positions": [],
+        "skillTags": payload.skillTags,
+        "joinDate": now,
+        "memberStatus": "pending_review",
+        "bio": payload.bio.strip() or "待审核新成员",
+    }
+
+    new_approval = {
+        "id": approval_id,
+        "type": "registration",
+        "targetId": member_id,
+        "submitterId": member_id,
+        "approverId": None,
+        "status": "pending",
+        "comment": "新成员注册申请",
+        "createdAt": now,
+        "reviewedAt": None,
+    }
+
+    database["users"].append(new_user)
+    database["members"].append(new_member)
+    database["approvals"].append(new_approval)
+
+    try:
+        saved = store.save_snapshot(database, snapshot["version"])
+    except PersistenceConflictError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=f"共享数据版本冲突，服务器当前版本为 {error.current_version}。",
+        ) from error
+
+    api_key = _load_api_key()
+    return {
+        "userId": user_id,
+        "memberId": member_id,
+        "status": "pending",
         "apiKey": api_key,
     }
 

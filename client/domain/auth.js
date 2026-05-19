@@ -2,7 +2,7 @@ import { state } from "../core/state.js";
 import { uid } from "../core/security.js";
 import { parseList } from "../core/utils.js";
 import { addRecord, removeWhere } from "../core/data-access.js";
-import { ensureDatabaseReady, ensureSharedDataSync, saveDatabase } from "../core/database.js";
+import { ensureDatabaseReady, ensureSharedDataSync, saveDatabase, resetDatabaseState } from "../core/database.js";
 import { clearApiKey, clearSession, saveSession, storeApiKey } from "../core/session.js";
 import { clearModalStack } from "../core/modal.js";
 import { getRoleForIdentity, ensureVisibleRoute } from "./permissions.js";
@@ -10,6 +10,7 @@ import { getCurrentUser, getMemberById, getApprovalById } from "./query.js";
 import { pushFlash, renderApp } from "../core/services.js";
 import { requestJson } from "../core/http.js";
 import { removeNotificationsByUser, getReviewerUserIds, createNotification } from "./notifications.js";
+import { getDraftKey, clearDraft } from "../core/drafts.js";
 
 export async function handleLogin(form) {
   const formData = new FormData(form);
@@ -73,45 +74,52 @@ export async function handleRegister(form) {
   const bio = String(formData.get("bio") || "").trim();
   const skillTags = parseList(String(formData.get("skills") || ""));
 
-if (!username || !name || !email || !phone || !department || !password) {
-     state.authFeedback = "请完整填写注册信息。";
-     renderApp();
-     return;
-   }
-   if (password !== confirmPassword) {
-     state.authFeedback = "两次输入的密码不一致，请重新输入。";
-     renderApp();
-     return;
-   }
-   if (state.database.users.some((user) => user.email.toLowerCase() === email)) {
-    state.authFeedback = "该邮箱已被注册，请直接登录。";
+  if (!username || !name || !email || !phone || !department || !password) {
+    state.authFeedback = "请完整填写注册信息。";
+    renderApp();
+    return;
+  }
+  if (password !== confirmPassword) {
+    state.authFeedback = "两次输入的密码不一致，请重新输入。";
     renderApp();
     return;
   }
 
-  const userId = uid("user");
-  const memberId = uid("member");
-  const now = new Date().toISOString();
+  let result;
+  try {
+    result = await requestJson("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username,
+        name,
+        email,
+        phone,
+        department,
+        password,
+        bio,
+        skillTags,
+      }),
+    });
+  } catch (error) {
+    state.authFeedback = error instanceof Error && error.message ? error.message : "注册失败，请稍后重试。";
+    renderApp();
+    return;
+  }
 
-  addRecord("users", { id: userId, memberId, username, email, passwordHash: password, status: "pending", createdAt: now, lastLoginAt: null });
-  addRecord("members", {
-    id: memberId, userId, name, avatar: "", phone, identity: "seedling", role: getRoleForIdentity("seedling"),
-    departments: [department], directions: [], robotGroups: [], positions: [], skillTags, joinDate: now, memberStatus: "pending_review", bio: bio || "待审核新成员",
-  });
-  const approval = { id: uid("approval"), type: "registration", targetId: memberId, submitterId: memberId, approverId: null, status: "pending", comment: "新成员注册申请", createdAt: now, reviewedAt: null };
-  addRecord("approvals", approval);
-
-  // Notify reviewers/admins of new registration
-  const reviewerUserIds = getReviewerUserIds();
-  reviewerUserIds.forEach((reviewerId) => {
-    createNotification(reviewerId, `新成员 ${name} 提交了注册申请，等待审核`, { sourceId: approval.id, sourceType: "approval", memberId: memberId, type: "info" });
-  });
-
-  if (!(await saveDatabase())) return;
-  state.currentUserId = userId;
-  clearSession();
-  ensureSharedDataSync();
+  state.currentUserId = result.userId;
   state.authFeedback = "";
+  clearDraft(getDraftKey("register"));
+  storeApiKey(result?.apiKey || "", false);
+
+  resetDatabaseState();
+  await ensureDatabaseReady();
+  saveSession(state.currentUserId, {
+    rememberMe: false,
+    apiKey: result?.apiKey || "",
+  });
+  ensureSharedDataSync();
+  pushFlash("注册成功，请等待管理员审核。", "info");
   renderApp();
 }
 

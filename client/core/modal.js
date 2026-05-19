@@ -28,7 +28,6 @@ export function popModal() {
   } else {
     state.modal = null;
   }
-  window.scrollTo(0, state.modalScrollY || 0);
   renderApp();
 }
 

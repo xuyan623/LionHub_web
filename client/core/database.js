@@ -87,6 +87,11 @@ function formatInitializationError(error) {
   return error instanceof Error ? error.message : String(error);
 }
 
+export function resetDatabaseState() {
+  state.databaseReady = false;
+  hydrationPromise = null;
+}
+
 export async function loadDatabase() {
   const snapshot = await fetchDatabaseSnapshot();
   if (snapshot.database) {

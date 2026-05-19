@@ -1,8 +1,9 @@
 import { appRoot, dictionaries, options, routes, state } from "../core/state.js";
 import { escapeAttribute, escapeHtml } from "../core/security.js";
-import { loadRouteChunk, loadWorkspaceRuntime, getLoadedWorkspaceRuntime } from "../core/runtime-loader.js";
+import { loadRouteChunk, loadWorkspaceRuntime, getLoadedWorkspaceRuntime, loadModalChunk, getLoadedModalChunk } from "../core/runtime-loader.js";
 import { saveSession } from "../core/session.js";
 import { setServices } from "../core/services.js";
+import { getDraftKey, loadDraft } from "../core/drafts.js";
 
 function dismissFlashDom() {
   state.flash = "";
@@ -72,7 +73,7 @@ function renderAppImpl() {
     }
 
     if (user.status !== "active") {
-      appRoot.innerHTML = renderWaitingShell(user);
+      appRoot.innerHTML = renderWaitingShell(user) + (state.modal ? renderModal() : "");
       return;
     }
 
@@ -184,23 +185,26 @@ function renderLoginForm() {
 }
 
 function renderRegisterForm() {
+  const draftKey = getDraftKey("register");
+  const draft = loadDraft(draftKey) || {};
+  const draftDepartment = draft.department || options.departments[0];
   return `
-    <form class="auth-form" data-form="register">
+    <form class="auth-form" data-form="register" data-draft-key="${escapeAttribute(draftKey)}" autocomplete="off">
       <div class="field-grid">
-        <label class="field-group"><span class="field-label">用户名</span><input class="field-input" type="text" name="username" placeholder="用于系统展示" required></label>
-        <label class="field-group"><span class="field-label">姓名</span><input class="field-input" type="text" name="name" placeholder="真实姓名或战队内姓名" required></label>
+        <label class="field-group"><span class="field-label">用户名</span><input class="field-input" type="text" name="username" placeholder="用于系统展示" required value="${escapeAttribute(draft.username || "")}" autocomplete="off" readonly data-readonly></label>
+        <label class="field-group"><span class="field-label">姓名</span><input class="field-input" type="text" name="name" placeholder="真实姓名或战队内姓名" required value="${escapeAttribute(draft.name || "")}" autocomplete="off" readonly data-readonly></label>
       </div>
       <div class="field-grid">
-        <label class="field-group"><span class="field-label">邮箱</span><input class="field-input" type="email" name="email" placeholder="用于登录" required></label>
-        <label class="field-group"><span class="field-label">手机号</span><input class="field-input" type="tel" name="phone" placeholder="用于联系" required></label>
+        <label class="field-group"><span class="field-label">邮箱</span><input class="field-input" type="email" name="email" placeholder="用于登录" required value="${escapeAttribute(draft.email || "")}" autocomplete="off" readonly data-readonly></label>
+        <label class="field-group"><span class="field-label">手机号</span><input class="field-input" type="tel" name="phone" placeholder="用于联系" required value="${escapeAttribute(draft.phone || "")}" autocomplete="tel-national" readonly data-readonly></label>
       </div>
-      <label class="field-group"><span class="field-label">密码</span><input class="field-input" type="password" name="password" placeholder="设置登录密码" required></label>
-      <label class="field-group"><span class="field-label">确认密码</span><input class="field-input" type="password" name="confirmPassword" placeholder="再次输入密码" required></label>
+      <label class="field-group"><span class="field-label">密码</span><input class="field-input" type="password" name="password" placeholder="设置登录密码" required autocomplete="new-password" readonly data-readonly></label>
+      <label class="field-group"><span class="field-label">确认密码</span><input class="field-input" type="password" name="confirmPassword" placeholder="再次输入密码" required autocomplete="new-password" readonly data-readonly></label>
       <div class="field-grid">
-        <label class="field-group"><span class="field-label">意向组别</span><select class="field-select" name="department" required>${renderSelectOptions(options.departments)}</select></label>
-        <label class="field-group"><span class="field-label">技能标签</span><input class="field-input" type="text" name="skills" placeholder="用逗号分隔，例如 C, ROS, OpenCV"></label>
+        <label class="field-group"><span class="field-label">意向组别</span><select class="field-select" name="department" required>${renderSelectOptions(options.departments, draftDepartment)}</select></label>
+        <label class="field-group"><span class="field-label">技能标签</span><input class="field-input" type="text" name="skills" placeholder="用逗号分隔，例如 C, ROS, OpenCV" value="${escapeAttribute(draft.skills || "")}" autocomplete="off" readonly data-readonly></label>
       </div>
-      <label class="field-group"><span class="field-label">个人简介</span><textarea class="field-textarea" name="bio" placeholder="简单介绍擅长方向、参与经历或希望承担的工作"></textarea></label>
+      <label class="field-group"><span class="field-label">个人简介</span><textarea class="field-textarea" name="bio" placeholder="简单介绍擅长方向、参与经历或希望承担的工作" readonly data-readonly>${escapeHtml(draft.bio || "")}</textarea></label>
       <div class="button-row"><button class="button-primary" type="submit" ${state.formLoading === "register" ? "disabled" : ""}>提交注册</button><button class="button-ghost" type="button" data-action="switch-auth" data-mode="login">返回登录</button></div>
     </form>
   `;
@@ -240,6 +244,29 @@ function renderWaitingShell(user) {
       </aside>
     </div>
   `;
+}
+
+function renderModal() {
+  const modalType = state.modal?.type;
+  if (!modalType) {
+    return "";
+  }
+  const modalModule = getLoadedModalChunk(modalType);
+  if (!modalModule) {
+    void loadModalChunk(modalType);
+    return `
+      <div class="modal">
+        <div class="modal-card glass-card">
+          <div class="section-header">
+            <div><h3>正在准备操作面板</h3><p>相关内容正在载入，请稍候。</p></div>
+            <button class="button-ghost" type="button" data-action="close-overlay">关闭</button>
+          </div>
+          <div class="empty-state">正在加载弹窗内容…</div>
+        </div>
+      </div>
+    `;
+  }
+  return modalModule.render(modalType);
 }
 
 function renderWorkspaceLoadingShell(member = null) {
